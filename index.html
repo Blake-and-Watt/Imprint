@@ -1,0 +1,2537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ImPrint V2.0</title>
+<!-- Load fonts non-blocking so a network failure never causes a black screen -->
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" media="print" onload="this.media='all'">
+<style>
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080808;
+    --bg1: #0f0f0f;
+    --bg2: #161616;
+    --bg3: #1e1e1e;
+    --border: #2a2a2a;
+    --border2: #333;
+    --text: #e8e8e8;
+    --text2: #888;
+    --text3: #555;
+    --accent: #e8ff47;
+    --accent2: #b8cc30;
+    --red: #ff4444;
+    --green: #44ff88;
+    --blue: #4499ff;
+    --mono: 'DM Mono', 'Courier New', 'Consolas', 'Menlo', monospace;
+    --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; }
+
+  /* ── Layout ── */
+  .app { display: flex; height: 100vh; }
+
+  .sidebar {
+    width: 220px; min-width: 220px; background: var(--bg1);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    padding: 0; user-select: none;
+  }
+
+  .logo {
+    padding: 20px 18px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-mark {
+    width: 32px; height: 32px; background: var(--accent); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .logo-mark svg { width: 18px; height: 18px; }
+  .logo-text { font-family: var(--mono); font-size: 11px; line-height: 1.4; letter-spacing: 0.05em; }
+  .logo-text strong { display: block; font-size: 13px; color: var(--text); letter-spacing: 0.08em; }
+  .logo-text span { color: var(--text3); font-size: 10px; }
+
+  .nav { padding: 12px 8px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px;
+    cursor: pointer; color: var(--text2); font-size: 12px; font-family: var(--mono);
+    letter-spacing: 0.04em; transition: all 0.15s; margin-bottom: 2px;
+    border: 1px solid transparent;
+  }
+  .nav-item:hover { background: var(--bg2); color: var(--text); }
+  .nav-item.active { background: var(--bg3); color: var(--accent); border-color: var(--border); }
+  .nav-item .badge {
+    margin-left: auto; background: var(--accent); color: #000; border-radius: 3px;
+    font-size: 10px; padding: 1px 5px; font-weight: 600;
+  }
+  .nav-icon { width: 14px; height: 14px; opacity: 0.8; }
+
+  .sidebar-footer { padding: 12px 18px; border-top: 1px solid var(--border); }
+  .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 6px; }
+  .sidebar-footer span { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+
+  /* ── Main ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .panel { display: none; flex: 1; overflow: hidden; }
+  .panel.active { display: flex; }
+
+  /* ── Process Panel ── */
+  .process-panel { flex-direction: row; }
+
+  /* Drop zone side */
+  .drop-side {
+    width: 360px; min-width: 300px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+
+  .panel-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg1);
+  }
+  .panel-title { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase; }
+  .panel-title span { color: var(--accent); }
+
+  .drop-zone {
+    margin: 16px; border: 1.5px dashed var(--border2); border-radius: 8px;
+    min-height: 160px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 8px; cursor: pointer; transition: all 0.2s;
+    position: relative; background: var(--bg1);
+  }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: rgba(232, 255, 71, 0.03); }
+  .drop-zone .dz-icon { width: 32px; height: 32px; color: var(--text3); }
+  .drop-zone .dz-title { font-family: var(--mono); font-size: 11px; color: var(--text2); }
+  .drop-zone .dz-sub { font-size: 11px; color: var(--text3); }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+  .image-list { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+  .image-list::-webkit-scrollbar { width: 4px; }
+  .image-list::-webkit-scrollbar-track { background: transparent; }
+  .image-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .image-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border-radius: 6px; background: var(--bg2); margin-bottom: 4px;
+    border: 1px solid var(--border);
+  }
+  .image-thumb {
+    width: 36px; height: 36px; border-radius: 4px; object-fit: cover;
+    background: var(--bg3); flex-shrink: 0;
+  }
+  .image-info { flex: 1; min-width: 0; }
+  .image-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .image-size { font-family: var(--mono); font-size: 10px; color: var(--text3); }
+  .image-remove {
+    width: 22px; height: 22px; border-radius: 4px; border: none; background: transparent;
+    color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .image-remove:hover { background: rgba(255,68,68,0.15); color: var(--red); }
+
+  .list-actions {
+    padding: 0 16px 12px; display: flex; gap: 8px;
+  }
+
+  /* Config side */
+  .config-side { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .config-scroll { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .config-scroll::-webkit-scrollbar { width: 4px; }
+  .config-scroll::-webkit-scrollbar-track { background: transparent; }
+  .config-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .section { margin-bottom: 24px; }
+  .section-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--text3);
+    text-transform: uppercase; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .field-full { grid-column: 1 / -1; }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 0.06em; }
+  .field input, .field textarea {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); font-family: var(--sans); font-size: 12px; padding: 7px 10px;
+    outline: none; transition: border-color 0.15s; resize: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { height: 60px; }
+
+  /* Custom fields */
+  .custom-fields { display: flex; flex-direction: column; gap: 6px; }
+  .custom-field {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .custom-field input.key { width: 120px; flex-shrink: 0; }
+  .custom-field input.val { flex: 1; }
+  .custom-field .remove-btn {
+    width: 26px; height: 26px; border-radius: 4px; border: none; background: var(--bg3);
+    color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .custom-field .remove-btn:hover { background: rgba(255,68,68,0.15); color: var(--red); }
+
+  /* ── Image list active state ── */
+  .image-item { cursor: pointer; }
+  .image-item.selected {
+    border-color: var(--accent); background: rgba(232,255,71,0.04);
+  }
+  .image-item .renamed-dot {
+    width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+    flex-shrink: 0; margin-left: 2px;
+  }
+  .image-item .image-output-name {
+    font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    color: var(--text);
+  }
+  .image-item .image-output-name.is-renamed { color: var(--accent); }
+  .image-item .image-original { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+  /* ── Per-image card ── */
+  .per-image-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .per-image-card.empty {
+    align-items: center; justify-content: center; min-height: 72px;
+    flex-direction: column; gap: 4px;
+  }
+  .per-image-card.empty span {
+    font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 0.05em;
+  }
+  .pi-thumb {
+    width: 52px; height: 52px; border-radius: 5px; object-fit: cover;
+    background: var(--bg3); flex-shrink: 0; border: 1px solid var(--border);
+  }
+  .pi-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+  .pi-filename-row { display: flex; align-items: center; gap: 5px; }
+  .pi-filename-row input { flex: 1; min-width: 0; }
+  .pi-ext { font-family: var(--mono); font-size: 11px; color: var(--text3); flex-shrink: 0; }
+  .pi-title-row { display: flex; gap: 5px; align-items: center; }
+  .pi-title-row input { flex: 1; min-width: 0; }
+  .apply-all-btn {
+    flex-shrink: 0; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border);
+    background: transparent; color: var(--text3); font-family: var(--mono); font-size: 9px;
+    letter-spacing: 0.05em; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .apply-all-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.06); }
+
+  /* ── Section badge / shared label ── */
+  .section-badge {
+    display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 3px;
+    font-size: 8px; font-family: var(--mono); letter-spacing: 0.08em; font-weight: 600;
+    background: rgba(68,153,255,0.12); color: var(--blue); border: 1px solid rgba(68,153,255,0.25);
+    margin-left: 6px; vertical-align: middle;
+  }
+
+  /* ── Bulk rename ── */
+  .bulk-rename-header {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; padding: 2px 0;
+  }
+  .bulk-rename-toggle {
+    font-family: var(--mono); font-size: 9px; color: var(--text3); letter-spacing: 0.05em;
+    background: none; border: none; cursor: pointer; padding: 2px 6px;
+    border-radius: 3px; transition: color 0.15s;
+  }
+  .bulk-rename-toggle:hover { color: var(--accent); }
+
+  .bulk-rename-panel {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; margin-top: 8px;
+  }
+  .bulk-rename-tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+  }
+  .bulk-rename-tab {
+    flex: 1; padding: 8px 12px; font-family: var(--mono); font-size: 10px;
+    letter-spacing: 0.06em; text-align: center; cursor: pointer; background: transparent;
+    border: none; color: var(--text3); transition: all 0.15s; border-bottom: 2px solid transparent;
+  }
+  .bulk-rename-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(232,255,71,0.03); }
+  .bulk-rename-body { padding: 12px; }
+
+  .rename-seq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .rename-seq-grid .field label { font-size: 9px; }
+  .rename-preview-label { font-family: var(--mono); font-size: 9px; color: var(--text3); letter-spacing: 0.06em; margin-bottom: 5px; }
+  .rename-preview-list {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 5px;
+    padding: 6px 8px; max-height: 80px; overflow-y: auto; margin-bottom: 10px;
+    font-family: var(--mono); font-size: 10px; color: var(--text2); line-height: 1.8;
+  }
+  .rename-preview-list::-webkit-scrollbar { width: 3px; }
+  .rename-preview-list::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .manual-rename-list { display: flex; flex-direction: column; gap: 5px; max-height: 200px; overflow-y: auto; margin-bottom: 10px; }
+  .manual-rename-list::-webkit-scrollbar { width: 3px; }
+  .manual-rename-list::-webkit-scrollbar-thumb { background: var(--border2); }
+  .manual-rename-row { display: flex; align-items: center; gap: 6px; }
+  .manual-rename-row .mr-thumb { width: 24px; height: 24px; border-radius: 3px; object-fit: cover; flex-shrink: 0; }
+  .manual-rename-row input { flex: 1; font-size: 11px; }
+  .manual-rename-row .mr-ext { font-family: var(--mono); font-size: 10px; color: var(--text3); flex-shrink: 0; }
+  .ac-wrap { position: relative; display: flex; align-items: center; }
+  .ac-wrap input, .ac-wrap textarea { flex: 1; padding-right: 30px; }
+  .ac-wrap textarea { padding-right: 10px; } /* textarea save btn goes outside */
+  .ac-wrap-textarea { position: relative; }
+  .ac-wrap-textarea textarea { width: 100%; }
+
+  .save-val-btn {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; border: none; background: transparent;
+    color: var(--text3); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; border-radius: 3px; transition: all 0.15s; padding: 0;
+    flex-shrink: 0;
+  }
+  .save-val-btn:hover { color: var(--accent); background: rgba(232,255,71,0.1); }
+  .save-val-btn svg { width: 11px; height: 11px; }
+  .save-val-btn.saved-flash { color: var(--accent); }
+
+  /* textarea save btn sits outside, top-right of the field */
+  .field-with-save { position: relative; }
+  .field-with-save .textarea-save-btn {
+    position: absolute; top: 22px; right: -24px;
+    width: 20px; height: 20px; border: none; background: transparent;
+    color: var(--text3); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; border-radius: 3px; transition: all 0.15s; padding: 0;
+  }
+  .field-with-save .textarea-save-btn:hover { color: var(--accent); background: rgba(232,255,71,0.1); }
+
+  .ac-dropdown {
+    display: none; position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: 6px;
+    z-index: 500; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    max-height: 180px; overflow-y: auto;
+  }
+  .ac-dropdown.open { display: block; }
+  .ac-dropdown::-webkit-scrollbar { width: 3px; }
+  .ac-dropdown::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .ac-item {
+    display: flex; align-items: center; padding: 7px 10px; cursor: pointer;
+    transition: background 0.1s; gap: 6px; font-size: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-item:hover, .ac-item.focused { background: var(--bg2); }
+  .ac-item-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--sans); }
+  .ac-item-text .ac-match { color: var(--accent); font-weight: 600; }
+  .ac-item-del {
+    width: 16px; height: 16px; border: none; background: transparent; color: var(--text3);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    border-radius: 2px; flex-shrink: 0; padding: 0; transition: all 0.1s;
+  }
+  .ac-item-del:hover { color: var(--red); background: rgba(255,68,68,0.15); }
+  .ac-item-del svg { width: 8px; height: 8px; }
+
+  .ac-empty {
+    padding: 8px 10px; font-family: var(--mono); font-size: 10px; color: var(--text3);
+    letter-spacing: 0.05em; text-align: center;
+  }
+
+  /* Title AC toggle */
+  .ac-toggle {
+    display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px;
+    border-radius: 3px; border: 1px solid var(--border); background: transparent;
+    color: var(--text3); font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em;
+    cursor: pointer; transition: all 0.15s; margin-left: 6px; vertical-align: middle;
+  }
+  .ac-toggle:hover { border-color: var(--border2); color: var(--text2); }
+  .ac-toggle.on { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.06); }
+  .ac-toggle svg { width: 8px; height: 8px; }
+  .wm-selector {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .wm-select {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); font-family: var(--sans); font-size: 12px; padding: 7px 10px;
+    outline: none; cursor: pointer;
+  }
+  .wm-select:focus { border-color: var(--accent); }
+
+  .opacity-row { display: flex; align-items: center; gap: 10px; }
+  .opacity-row label { font-family: var(--mono); font-size: 10px; color: var(--text3); white-space: nowrap; }
+  .opacity-row input[type=range] {
+    flex: 1; -webkit-appearance: none; height: 3px; background: var(--border2);
+    border-radius: 2px; outline: none;
+  }
+  .opacity-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer;
+  }
+  .opacity-val { font-family: var(--mono); font-size: 11px; color: var(--accent); min-width: 30px; text-align: right; }
+
+  /* Export bar */
+  .export-bar {
+    padding: 16px 20px; border-top: 1px solid var(--border); background: var(--bg1);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .export-row { display: flex; gap: 8px; align-items: center; }
+  .export-row label { font-family: var(--mono); font-size: 10px; color: var(--text3); white-space: nowrap; }
+  .zip-name-input {
+    flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); font-family: var(--mono); font-size: 12px; padding: 7px 10px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .zip-name-input:focus { border-color: var(--accent); }
+  .zip-ext { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--border2); color: var(--text); background: var(--bg2); }
+  .btn-primary { background: var(--accent); color: #000; font-weight: 600; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+  .btn-danger { background: transparent; border: 1px solid rgba(255,68,68,0.3); color: var(--red); }
+  .btn-danger:hover:not(:disabled) { background: rgba(255,68,68,0.1); }
+  .btn-sm { padding: 5px 10px; font-size: 10px; }
+
+  /* Progress */
+  .progress-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    z-index: 1000; align-items: center; justify-content: center; flex-direction: column; gap: 16px;
+  }
+  .progress-overlay.show { display: flex; }
+  .progress-box {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 32px 48px; display: flex; flex-direction: column; align-items: center; gap: 16px;
+    min-width: 280px;
+  }
+  .progress-title { font-family: var(--mono); font-size: 12px; color: var(--text2); letter-spacing: 0.08em; }
+  .progress-bar-wrap { width: 100%; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.2s; width: 0%; }
+  .progress-count { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+
+  /* ── Watermarks Panel ── */
+  .wm-panel { flex-direction: row; }
+
+  .wm-library-side {
+    width: 280px; min-width: 240px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .wm-list { flex: 1; overflow-y: auto; padding: 12px; }
+  .wm-card {
+    border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg1);
+    padding: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .wm-card:hover { border-color: var(--border2); background: var(--bg2); }
+  .wm-card.selected { border-color: var(--accent); background: rgba(232,255,71,0.04); }
+  .wm-card-preview {
+    width: 100%; height: 70px; display: flex; align-items: center; justify-content: center;
+    background: repeating-conic-gradient(#222 0% 25%, transparent 0% 50%) 0 0 / 12px 12px;
+    border-radius: 4px; overflow: hidden; margin-bottom: 8px;
+  }
+  .wm-card-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .wm-card-name-row { display: flex; align-items: center; gap: 6px; }
+  .wm-card-name { font-size: 11px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wm-card-name-input {
+    flex: 1; background: var(--bg3); border: 1px solid var(--accent); border-radius: 3px;
+    color: var(--text); font-size: 11px; padding: 2px 6px; outline: none;
+  }
+
+  /* WM Editor side */
+  .wm-editor-side { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .wm-editor-content { flex: 1; overflow-y: auto; padding: 20px; }
+  .wm-editor-content::-webkit-scrollbar { width: 4px; }
+  .wm-editor-content::-webkit-scrollbar-track { background: transparent; }
+  .wm-editor-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .ratio-hint {
+    font-family: var(--mono); font-size: 11px; color: var(--text3); margin-bottom: 16px;
+    line-height: 1.7;
+  }
+
+  .ratios-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+
+  .ratio-card { border: 1px solid var(--border); border-radius: 8px; background: var(--bg1); overflow: hidden; }
+  .ratio-card-header {
+    padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg2);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ratio-label { font-family: var(--mono); font-size: 10px; color: var(--text2); letter-spacing: 0.08em; }
+  .ratio-saved { font-family: var(--mono); font-size: 9px; color: var(--green); }
+  .ratio-canvas-wrap {
+    padding: 12px; display: flex; align-items: center; justify-content: center;
+    background: repeating-conic-gradient(#111 0% 25%, transparent 0% 50%) 0 0 / 8px 8px;
+    min-height: 120px;
+  }
+  .ratio-canvas {
+    cursor: crosshair; display: block; border: 1px solid rgba(255,255,255,0.05);
+  }
+  .ratio-actions { padding: 8px 12px; display: flex; gap: 6px; align-items: center; border-top: 1px solid var(--border); }
+  .ratio-actions .spacer { flex: 1; }
+
+  .lock-btn {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px;
+    border-radius: 4px; border: 1px solid var(--border); background: transparent;
+    color: var(--text3); font-family: var(--mono); font-size: 9px; letter-spacing: 0.05em;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .lock-btn:hover { border-color: var(--border2); color: var(--text2); }
+  .lock-btn.locked { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.06); }
+  .lock-btn svg { width: 9px; height: 9px; }
+
+  .empty-state {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; color: var(--text3); padding: 40px;
+  }
+  .empty-state svg { width: 48px; height: 48px; opacity: 0.3; }
+  .empty-state p { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-align: center; }
+
+  /* Toast */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 16px; font-family: var(--mono); font-size: 11px; color: var(--text);
+    display: flex; align-items: center; gap: 8px; min-width: 200px;
+    animation: slideIn 0.2s ease; letter-spacing: 0.04em;
+  }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+  .toast.info { border-left: 3px solid var(--blue); }
+  /* ── Metadata Viewer Panel ── */
+  .viewer-panel { flex-direction: row; }
+  .viewer-drop-side {
+    width: 280px; min-width: 240px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  .viewer-results-side { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .viewer-results-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .viewer-results-content::-webkit-scrollbar { width: 4px; }
+  .viewer-results-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .viewer-file-list { flex: 1; overflow-y: auto; padding: 8px 12px; }
+  .viewer-file-list::-webkit-scrollbar { width: 4px; }
+  .viewer-file-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .viewer-file-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 5px;
+    cursor: pointer; transition: all 0.12s; border: 1px solid transparent; margin-bottom: 3px;
+  }
+  .viewer-file-item:hover { background: var(--bg2); }
+  .viewer-file-item.active { background: var(--bg3); border-color: var(--border); }
+  .viewer-file-item .vf-thumb {
+    width: 32px; height: 32px; border-radius: 3px; object-fit: cover; flex-shrink: 0;
+    background: var(--bg3);
+  }
+  .viewer-file-item .vf-name { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .viewer-file-item .vf-status {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .vf-status.has-meta { background: var(--green); }
+  .vf-status.no-meta { background: var(--text3); }
+  .vf-status.error { background: var(--red); }
+
+  /* Metadata result card */
+  .meta-result { margin-bottom: 20px; }
+  .meta-result-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  .meta-result-thumb {
+    width: 48px; height: 48px; border-radius: 5px; object-fit: cover;
+    background: var(--bg3); flex-shrink: 0;
+  }
+  .meta-result-file { flex: 1; min-width: 0; }
+  .meta-result-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta-result-dims { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 2px; }
+
+  .meta-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px; }
+  .meta-chip {
+    padding: 3px 8px; border-radius: 3px; font-family: var(--mono); font-size: 9px;
+    letter-spacing: 0.05em; border: 1px solid;
+  }
+  .chip-has { background: rgba(68,255,136,0.08); color: var(--green); border-color: rgba(68,255,136,0.25); }
+  .chip-none { background: var(--bg3); color: var(--text3); border-color: var(--border); }
+
+  .meta-table { width: 100%; border-collapse: collapse; }
+  .meta-table tr { border-bottom: 1px solid var(--border); }
+  .meta-table tr:last-child { border-bottom: none; }
+  .meta-table td { padding: 6px 8px; font-size: 12px; vertical-align: top; }
+  .meta-table td:first-child {
+    font-family: var(--mono); font-size: 10px; color: var(--text3); white-space: nowrap;
+    width: 160px; letter-spacing: 0.04em; padding-right: 16px;
+  }
+  .meta-table td:last-child { color: var(--text); word-break: break-word; }
+  .meta-empty-row td { color: var(--text3); font-style: italic; font-size: 11px; }
+
+  .viewer-empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; color: var(--text3); padding: 40px; text-align: center;
+  }
+  .viewer-empty svg { width: 48px; height: 48px; opacity: 0.25; }
+  .viewer-empty p { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; line-height: 1.7; }
+
+  .viewer-analyse-btn-bar { padding: 12px; border-top: 1px solid var(--border); }
+
+  .meta-section-label {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; color: var(--text3);
+    text-transform: uppercase; margin: 12px 0 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .meta-section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ── Settings Panel ── */
+  .settings-panel { flex-direction: column; overflow: hidden; }
+  .settings-scroll { flex: 1; overflow-y: auto; padding: 24px 28px; max-width: 700px; }
+  .settings-scroll::-webkit-scrollbar { width: 4px; }
+  .settings-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .settings-section { margin-bottom: 32px; }
+  .settings-section-title {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text3);
+    text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;
+  }
+  .settings-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .settings-field-full { grid-column: 1 / -1; }
+
+  .toggle-row {
+    display: flex; align-items: flex-start; gap: 14px; padding: 14px 16px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .toggle-row.highlight { border-color: rgba(232,255,71,0.2); background: rgba(232,255,71,0.03); }
+  .toggle-col { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .toggle-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .toggle-desc { font-family: var(--mono); font-size: 10px; color: var(--text3); line-height: 1.6; letter-spacing: 0.03em; }
+  .toggle-desc a { color: var(--accent); text-decoration: none; }
+  .toggle-desc a:hover { text-decoration: underline; }
+  .toggle-tag {
+    display: inline-block; padding: 2px 6px; border-radius: 3px; font-family: var(--mono);
+    font-size: 9px; letter-spacing: 0.06em; margin-left: 6px; vertical-align: middle;
+  }
+  .tag-optional { background: rgba(68,153,255,0.15); color: var(--blue); border: 1px solid rgba(68,153,255,0.3); }
+  .tag-recommended { background: rgba(68,255,136,0.1); color: var(--green); border: 1px solid rgba(68,255,136,0.25); }
+
+  /* Toggle switch */
+  .toggle-switch { flex-shrink: 0; margin-top: 2px; }
+  .toggle-switch input { display: none; }
+  .toggle-switch label {
+    display: block; width: 36px; height: 20px; border-radius: 10px;
+    background: var(--bg3); border: 1px solid var(--border2); cursor: pointer;
+    position: relative; transition: all 0.2s;
+  }
+  .toggle-switch label::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--text3); transition: all 0.2s;
+  }
+  .toggle-switch input:checked + label { background: var(--accent); border-color: var(--accent2); }
+  .toggle-switch input:checked + label::after { left: 19px; background: #000; }
+
+  .settings-save-bar {
+    padding: 16px 28px; border-top: 1px solid var(--border); background: var(--bg1);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .settings-saved-note { font-family: var(--mono); font-size: 10px; color: var(--green); display: none; }
+
+  /* About card */
+  .about-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; display: flex; gap: 16px; align-items: flex-start;
+  }
+  .about-avatar {
+    width: 44px; height: 44px; border-radius: 8px; background: var(--accent);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    font-family: var(--mono); font-size: 16px; font-weight: 700; color: #000;
+  }
+  .about-info { flex: 1; }
+  .about-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .about-role { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-bottom: 8px; letter-spacing: 0.05em; }
+  .about-links { display: flex; gap: 8px; flex-wrap: wrap; }
+  .about-link {
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px;
+    border-radius: 4px; border: 1px solid var(--border); background: var(--bg3);
+    color: var(--text2); font-family: var(--mono); font-size: 10px; text-decoration: none;
+    transition: all 0.15s; letter-spacing: 0.04em;
+  }
+  .about-link:hover { border-color: var(--accent); color: var(--accent); }
+  .about-link.kofi { border-color: rgba(255,95,95,0.4); color: #ff8080; }
+  .about-link.kofi:hover { border-color: #ff5f5f; color: #ff5f5f; background: rgba(255,95,95,0.08); }
+
+  .credit-note {
+    margin-top: 16px; padding: 12px 16px; border-radius: 8px;
+    background: var(--bg2); border: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px; color: var(--text3); line-height: 1.7;
+    letter-spacing: 0.03em;
+  }
+  .credit-note strong { color: var(--text2); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 18 18" fill="none">
+          <rect x="1"  y="1"  width="7" height="7" rx="1.2" fill="#0a0a0a"/>
+          <rect x="10" y="1"  width="7" height="7" rx="1.2" fill="#0a0a0a"/>
+          <rect x="1"  y="10" width="7" height="7" rx="1.2" fill="#0a0a0a"/>
+          <rect x="10" y="10" width="4.5" height="4.5" rx="0.7" fill="#0a0a0a"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <strong>ImPrint <span style="font-size:10px;opacity:0.6;letter-spacing:0.04em;">V2.0</span></strong>
+        <span>Pwrd by: <a href="https://ko-fi.com/BlakeAndWatt" style="color:var(--accent);text-decoration:none;">Blake &amp; Watt</a></span>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-panel="process">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="currentColor">
+          <rect x="1" y="1" width="5" height="5" rx="0.5"/>
+          <rect x="8" y="1" width="5" height="5" rx="0.5"/>
+          <rect x="1" y="8" width="5" height="5" rx="0.5"/>
+          <rect x="8" y="8" width="5" height="5" rx="0.5"/>
+        </svg>
+        Process Images
+        <span class="badge" id="img-count" style="display:none">0</span>
+      </div>
+      <div class="nav-item" data-panel="watermarks">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <circle cx="7" cy="7" r="5"/>
+          <path d="M4 7c0-1.66 1.34-3 3-3s3 1.34 3 3-1.34 3-3 3-3-1.34-3-3z"/>
+          <circle cx="7" cy="7" r="1" fill="currentColor"/>
+        </svg>
+        Watermarks
+        <span class="badge" id="wm-count" style="display:none">0</span>
+      </div>
+      <div class="nav-item" data-panel="viewer">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M1 3h12M1 7h8M1 11h5"/>
+          <circle cx="11.5" cy="10.5" r="2"/>
+          <path d="M13 12l1.2 1.2"/>
+        </svg>
+        Metadata Viewer
+      </div>
+      <div class="nav-item" data-panel="settings">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <circle cx="7" cy="7" r="2"/>
+          <path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.9 2.9l1.1 1.1M10 10l1.1 1.1M2.9 11.1L4 10M10 4l1.1-1.1"/>
+        </svg>
+        Settings
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="https://ko-fi.com/BlakeAndWatt" id="kofi-link"
+        style="display:flex;align-items:center;gap:6px;text-decoration:none;padding:6px 0;border-radius:4px;transition:opacity 0.15s;opacity:0.7;"
+        title="Support Imprint on Ko-fi">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="#ff5f5f">
+          <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
+        </svg>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text3);">Support on Ko-fi</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ── Process Panel ── -->
+    <div class="panel process-panel active" id="panel-process">
+
+      <!-- LEFT: Image list -->
+      <div class="drop-side">
+        <div class="panel-header">
+          <span class="panel-title">Images <span id="file-count-label"></span></span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" id="select-all-btn" style="display:none">All</button>
+            <button class="btn btn-ghost btn-sm" id="clear-all-btn">Clear</button>
+          </div>
+        </div>
+        <div class="drop-zone" id="drop-zone" style="margin:12px 12px 8px;min-height:100px;">
+          <input type="file" id="file-input" multiple accept="image/*">
+          <svg class="dz-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="6" width="24" height="20" rx="2"/>
+            <circle cx="11" cy="12" r="2"/>
+            <path d="M4 22l7-7 5 5 4-4 8 6"/>
+          </svg>
+          <div class="dz-title">Drop images here</div>
+          <div class="dz-sub">JPG · PNG · WEBP · TIFF</div>
+        </div>
+        <div class="image-list" id="image-list"></div>
+        <div class="list-actions" id="list-actions" style="display:none;padding:0 12px 10px;">
+          <button class="btn btn-danger btn-sm" id="remove-selected-btn">Remove selected</button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Metadata + Export -->
+      <div class="config-side">
+        <div class="panel-header">
+          <span class="panel-title">Metadata &amp; Export</span>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;">
+              <input type="checkbox" id="strip-toggle" checked style="accent-color:var(--accent)">
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:0.06em">STRIP ORIGINAL</span>
+            </label>
+          </div>
+        </div>
+        <div class="config-scroll">
+
+          <!-- ── PER-IMAGE SECTION ── -->
+          <div class="section">
+            <div class="section-title">
+              Selected Image
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.03em;font-weight:normal;margin-left:4px;">click image in list to edit</span>
+            </div>
+            <div class="per-image-card empty" id="per-image-card">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:0.25"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              <span>No image selected — click one in the list</span>
+            </div>
+          </div>
+
+          <!-- ── BULK RENAME ── -->
+          <div class="section" id="bulk-rename-section" style="display:none">
+            <div class="bulk-rename-header" id="bulk-rename-header">
+              <span class="section-title" style="margin-bottom:0">Bulk Rename <span class="section-badge">ALL FILES</span></span>
+              <button class="bulk-rename-toggle" id="bulk-rename-toggle-btn">▾ EXPAND</button>
+            </div>
+            <div class="bulk-rename-panel" id="bulk-rename-panel" style="display:none">
+              <div class="bulk-rename-tabs">
+                <button class="bulk-rename-tab active" data-mode="sequential">Sequential</button>
+                <button class="bulk-rename-tab" data-mode="manual">Manual (one by one)</button>
+              </div>
+              <div class="bulk-rename-body">
+                <!-- Sequential mode -->
+                <div id="rename-mode-sequential">
+                  <div class="rename-seq-grid">
+                    <div class="field">
+                      <label>PREFIX</label>
+                      <input type="text" id="seq-prefix" placeholder="e.g. photo_">
+                    </div>
+                    <div class="field">
+                      <label>SUFFIX</label>
+                      <input type="text" id="seq-suffix" placeholder="e.g. _final">
+                    </div>
+                    <div class="field">
+                      <label>START NUMBER</label>
+                      <input type="number" id="seq-start" value="1" min="0">
+                    </div>
+                    <div class="field">
+                      <label>PAD DIGITS (e.g. 3 → 001)</label>
+                      <input type="number" id="seq-pad" value="2" min="1" max="6">
+                    </div>
+                  </div>
+                  <div class="rename-preview-label">PREVIEW</div>
+                  <div class="rename-preview-list" id="seq-preview"></div>
+                  <button class="btn btn-primary btn-sm" id="apply-sequential-btn" style="width:100%">Apply Sequential Names</button>
+                </div>
+                <!-- Manual mode -->
+                <div id="rename-mode-manual" style="display:none">
+                  <div class="manual-rename-list" id="manual-rename-list"></div>
+                  <button class="btn btn-primary btn-sm" id="apply-manual-btn" style="width:100%">Apply These Names</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── SHARED METADATA (all images) ── -->
+          <div class="section">
+            <div class="section-title">Shared Metadata <span class="section-badge">ALL FILES</span></div>
+            <div class="field-grid">
+
+              <div class="field">
+                <label>AUTHOR / CREATOR</label>
+                <div class="ac-wrap">
+                  <input type="text" id="meta-author" placeholder="Name">
+                  <button class="save-val-btn" data-field="author" title="Save this value">
+                    <svg viewBox="0 0 11 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1h9v11l-4.5-3L1 12V1z"/></svg>
+                  </button>
+                  <div class="ac-dropdown" id="ac-author"></div>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>COPYRIGHT</label>
+                <div class="ac-wrap">
+                  <input type="text" id="meta-copyright" placeholder="© 2024 Name">
+                  <button class="save-val-btn" data-field="copyright" title="Save this value">
+                    <svg viewBox="0 0 11 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1h9v11l-4.5-3L1 12V1z"/></svg>
+                  </button>
+                  <div class="ac-dropdown" id="ac-copyright"></div>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>SOFTWARE</label>
+                <div class="ac-wrap">
+                  <input type="text" id="meta-software" placeholder="App name">
+                  <button class="save-val-btn" data-field="software" title="Save this value">
+                    <svg viewBox="0 0 11 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1h9v11l-4.5-3L1 12V1z"/></svg>
+                  </button>
+                  <div class="ac-dropdown" id="ac-software"></div>
+                </div>
+              </div>
+
+              <div class="field">
+                <label>KEYWORDS</label>
+                <div class="ac-wrap">
+                  <input type="text" id="meta-keywords" placeholder="tag1, tag2">
+                  <button class="save-val-btn" data-field="keywords" title="Save this value">
+                    <svg viewBox="0 0 11 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1h9v11l-4.5-3L1 12V1z"/></svg>
+                  </button>
+                  <div class="ac-dropdown" id="ac-keywords"></div>
+                </div>
+              </div>
+
+              <div class="field field-full">
+                <label>COMMENT</label>
+                <div class="ac-wrap">
+                  <input type="text" id="meta-comment" placeholder="Internal comment">
+                  <button class="save-val-btn" data-field="comment" title="Save this value">
+                    <svg viewBox="0 0 11 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1h9v11l-4.5-3L1 12V1z"/></svg>
+                  </button>
+                  <div class="ac-dropdown" id="ac-comment"></div>
+                </div>
+              </div>
+
+              <div class="field field-full">
+                <label>DESCRIPTION</label>
+                <div class="ac-wrap-textarea">
+                  <textarea id="meta-description" placeholder="Image description..."></textarea>
+                  <div class="ac-dropdown" id="ac-description"></div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Custom fields -->
+          <div class="section">
+            <div class="section-title">Custom Fields <span class="section-badge">ALL FILES</span></div>
+            <div class="custom-fields" id="custom-fields"></div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:8px" id="add-custom-field">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 1v8M1 5h8"/></svg>
+              Add field
+            </button>
+          </div>
+
+          <!-- Watermark -->
+          <div class="section">
+            <div class="section-title">Watermark <span class="section-badge">ALL FILES</span></div>
+            <div class="wm-selector">
+              <div class="field">
+                <label>SELECT WATERMARK</label>
+                <select class="wm-select" id="wm-select">
+                  <option value="">— None —</option>
+                </select>
+              </div>
+              <div class="opacity-row" id="opacity-row" style="display:none">
+                <label>OPACITY</label>
+                <input type="range" min="10" max="100" value="80" id="wm-opacity">
+                <span class="opacity-val" id="opacity-val">80%</span>
+              </div>
+              <div id="wm-no-positions-warning" style="display:none" class="ratio-hint">
+                ⚠ No positions saved for this watermark. Edit in the Watermarks tab.
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Export bar -->
+        <div class="export-bar">
+          <div class="export-row">
+            <label>ZIP NAME</label>
+            <input type="text" class="zip-name-input" id="zip-name" placeholder="processed-images">
+            <span class="zip-ext">.zip</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-primary" id="export-btn" disabled>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M6 1v7M3 5l3 3 3-3M1 10h10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+              Export ZIP
+            </button>
+            <span id="last-name-hint" style="font-family:var(--mono);font-size:10px;color:var(--text3);display:none"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Watermarks Panel ── -->
+    <div class="panel wm-panel" id="panel-watermarks">
+      <div class="wm-library-side">
+        <div class="panel-header">
+          <span class="panel-title">Library</span>
+          <button class="btn btn-primary btn-sm" id="add-wm-btn">+ Add</button>
+        </div>
+        <div class="wm-list" id="wm-list">
+          <div class="empty-state" id="wm-empty">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="24" cy="24" r="18"/>
+              <circle cx="24" cy="24" r="8"/>
+              <circle cx="24" cy="24" r="3" fill="currentColor"/>
+            </svg>
+            <p>No watermarks yet.<br>Click + Add to upload a PNG.</p>
+          </div>
+        </div>
+      </div>
+      <div class="wm-editor-side" id="wm-editor-side">
+        <div class="panel-header" id="wm-editor-header">
+          <span class="panel-title">Position Editor</span>
+          <span id="wm-editor-name" style="font-family:var(--mono);font-size:11px;color:var(--accent)"></span>
+        </div>
+        <div class="wm-editor-content" id="wm-editor-content">
+          <div class="empty-state" id="wm-select-hint">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="8" y="8" width="32" height="32" rx="3"/>
+              <path d="M16 24h16M24 16v16"/>
+            </svg>
+            <p>Select a watermark from the library<br>to configure positions per ratio.</p>
+          </div>
+          <div id="wm-ratios-editor" style="display:none">
+            <div class="ratio-hint">
+              Drag & resize the watermark on each aspect ratio canvas.<br>
+              Positions are saved independently per ratio and auto-applied during export.
+            </div>
+            <div class="ratios-grid" id="ratios-grid"></div>
+            <div style="margin-top:16px;display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" id="save-all-positions-btn">Save All Positions</button>
+              <button class="btn btn-ghost btn-sm" id="reset-all-positions-btn">Reset All</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Settings Panel ── -->
+    <!-- ── Metadata Viewer Panel ── -->
+    <div class="panel viewer-panel" id="panel-viewer">
+      <div class="viewer-drop-side">
+        <div class="panel-header">
+          <span class="panel-title">Files</span>
+          <button class="btn btn-ghost btn-sm" id="viewer-clear-btn">Clear</button>
+        </div>
+        <div class="drop-zone" id="viewer-drop-zone" style="margin:12px;min-height:120px;">
+          <input type="file" id="viewer-file-input" multiple accept="image/*">
+          <svg class="dz-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="4" y="6" width="24" height="20" rx="2"/>
+            <circle cx="11" cy="12" r="2"/>
+            <path d="M4 22l7-7 5 5 4-4 8 6"/>
+          </svg>
+          <div class="dz-title">Drop images to inspect</div>
+          <div class="dz-sub">Reads original metadata as-is</div>
+        </div>
+        <div class="viewer-file-list" id="viewer-file-list"></div>
+        <div class="viewer-analyse-btn-bar">
+          <button class="btn btn-primary" id="viewer-analyse-btn" disabled style="width:100%;">
+            Analyse All
+          </button>
+        </div>
+      </div>
+      <div class="viewer-results-side">
+        <div class="panel-header">
+          <span class="panel-title">Metadata <span id="viewer-result-label" style="color:var(--text3)"></span></span>
+          <button class="btn btn-ghost btn-sm" id="viewer-export-report-btn" style="display:none">Export Report</button>
+        </div>
+        <div class="viewer-results-content" id="viewer-results-content">
+          <div class="viewer-empty" id="viewer-empty-state">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2">
+              <path d="M8 12h32M8 20h24M8 28h16M8 36h10"/>
+              <circle cx="37" cy="34" r="7"/>
+              <path d="M42 39l4 4"/>
+            </svg>
+            <p>Drop images in the left panel<br>and click Analyse All to read<br>their original metadata.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel settings-panel" id="panel-settings">
+      <div class="panel-header" style="border-bottom:1px solid var(--border);background:var(--bg1);padding:16px 28px;">
+        <span class="panel-title">Settings</span>
+      </div>
+      <div class="settings-scroll">
+
+        <!-- Export Options -->
+        <div class="settings-section">
+          <div class="settings-section-title">Export Options</div>
+          <div class="toggle-row">
+            <div class="toggle-col">
+              <span class="toggle-label">
+                Wrap files in folder inside ZIP
+                <span class="toggle-tag tag-optional">OPTIONAL</span>
+              </span>
+              <span class="toggle-desc">
+                When enabled, all exported images are placed inside a named folder within the ZIP archive.<br>
+                Unzipping creates: <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:10px;">your-zip-name/image1.jpg</code><br>
+                When disabled, images sit loose at the root:<br>
+                <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:10px;">image1.jpg</code> directly on unzip.
+              </span>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="setting-folder-in-zip">
+              <label for="setting-folder-in-zip"></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Default Metadata -->
+        <div class="settings-section">
+          <div class="settings-section-title">Default Metadata
+            <span style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.04em;font-weight:normal;">
+              Auto-filled on every export · overridden if you type in the field manually
+            </span>
+          </div>
+          <div class="settings-grid">
+            <div class="field">
+              <label>DEFAULT AUTHOR / CREATOR</label>
+              <input type="text" id="setting-author" placeholder="e.g. Anthony Nicolas">
+            </div>
+            <div class="field">
+              <label>DEFAULT COPYRIGHT</label>
+              <input type="text" id="setting-copyright" placeholder="e.g. © 2024 Blake & Watt">
+            </div>
+            <div class="field">
+              <label>DEFAULT SOFTWARE</label>
+              <input type="text" id="setting-software" placeholder="e.g. Imprint">
+            </div>
+            <div class="field">
+              <label>DEFAULT KEYWORDS</label>
+              <input type="text" id="setting-keywords" placeholder="e.g. photography, portfolio">
+            </div>
+            <div class="field settings-field-full">
+              <label>DEFAULT COMMENT</label>
+              <input type="text" id="setting-comment" placeholder="e.g. Processed with Imprint">
+            </div>
+            <div class="field settings-field-full">
+              <label>DEFAULT DESCRIPTION</label>
+              <textarea id="setting-description" style="height:56px;" placeholder="A default description applied to all exported images..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Powered By -->
+        <div class="settings-section">
+          <div class="settings-section-title">Attribution</div>
+
+          <div class="toggle-row highlight">
+            <div class="toggle-col">
+              <span class="toggle-label">
+                Powered by Imprint
+                <span class="toggle-tag tag-optional">OPTIONAL</span>
+              </span>
+              <span class="toggle-desc">
+                Adds a hidden metadata field to every exported image:<br>
+                <code style="background:var(--bg3);padding:2px 5px;border-radius:3px;font-size:10px;">powered_by = Imprint · https://github.com/Blake-and-Watt/Imprint</code><br><br>
+                This is written into the image's XMP data — it is <strong style="color:var(--text2);">not visible</strong> in the image itself, only readable by EXIF/metadata tools.
+                It helps others discover where Imprint came from. Completely optional and fully your choice.
+              </span>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="setting-powered-by">
+              <label for="setting-powered-by"></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- About -->
+        <div class="settings-section">
+          <div class="settings-section-title">About Imprint</div>
+          <div class="about-card">
+            <div class="about-avatar">AN</div>
+            <div class="about-info">
+              <div class="about-name">Anthony Nicolas</div>
+              <div class="about-role">CREATOR · BLAKE &amp; WATT</div>
+              <div class="about-links">
+                <a class="about-link kofi" href="https://ko-fi.com/BlakeAndWatt" target="_blank">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
+                  </svg>
+                  Support on Ko-fi
+                </a>
+                <a class="about-link" href="https://github.com/Blake-and-Watt/Imprint" target="_blank">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                  </svg>
+                  GitHub
+                </a>
+              </div>
+            </div>
+          </div>
+          <div class="credit-note">
+            <strong>Special thanks:</strong> Imprint was built with significant assistance from <strong>Claude</strong> by Anthropic —
+            an AI that helped architect, code, and refine this entire application from scratch.
+            The watermark positioning system, metadata pipeline, autocomplete engine, and ZIP export were all
+            developed in collaboration with Claude. If you're curious what AI-assisted development can look like at its best,
+            <a href="https://claude.ai" style="color:var(--accent);text-decoration:none;">claude.ai</a> is worth exploring.
+          </div>
+        </div>
+
+      </div>
+      <div class="settings-save-bar">
+        <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
+        <span class="settings-saved-note" id="settings-saved-note">✓ Settings saved</span>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Progress -->
+<div class="progress-overlay" id="progress-overlay">
+  <div class="progress-box">
+    <div class="progress-title">PROCESSING IMAGES</div>
+    <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="progress-count" id="progress-count">0 / 0</div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let images = []; // { name, data (base64), size, url }
+let watermarks = []; // { id, name, data (dataURL), ... }
+let savedValues = {}; // { fieldKey: [val1, val2, ...] }
+let selectedWatermarkId = null; // for editor
+let currentPositions = {}; // { ratioKey: { x, y, w, h } in 0-1 fractions }
+let canvasStates = {}; // per ratio canvas drag state
+
+const RATIOS = [
+  { id: '1:1',  w: 1,  h: 1 },
+  { id: '3:4',  w: 3,  h: 4 },
+  { id: '4:3',  w: 4,  h: 3 },
+  { id: '2:3',  w: 2,  h: 3 },
+  { id: '3:2',  w: 3,  h: 2 },
+  { id: '9:16', w: 9,  h: 16 },
+  { id: '16:9', w: 16, h: 9 },
+  { id: '5:4',  w: 5,  h: 4 },
+  { id: '4:5',  w: 4,  h: 5 },
+  { id: '21:9', w: 21, h: 9 },
+];
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  const config = await window.api.getConfig();
+  document.getElementById('zip-name').value = config.lastZipName || 'processed-images';
+  if (config.lastZipName) {
+    const hint = document.getElementById('last-name-hint');
+    hint.textContent = `Last: ${config.lastZipName}.zip`;
+    hint.style.display = 'block';
+  }
+
+  savedValues = await window.api.getSavedValues();
+  await loadSettings();
+
+  // Wire up shared field autocomplete + save buttons
+  const stdFields = [
+    { inputId: 'meta-author',      dropId: 'ac-author',      fieldKey: 'author' },
+    { inputId: 'meta-copyright',   dropId: 'ac-copyright',   fieldKey: 'copyright' },
+    { inputId: 'meta-software',    dropId: 'ac-software',    fieldKey: 'software' },
+    { inputId: 'meta-keywords',    dropId: 'ac-keywords',    fieldKey: 'keywords' },
+    { inputId: 'meta-comment',     dropId: 'ac-comment',     fieldKey: 'comment' },
+    { inputId: 'meta-description', dropId: 'ac-description', fieldKey: 'description' },
+  ];
+
+  stdFields.forEach(({ inputId, dropId, fieldKey }) => {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    attachAutocomplete(input, fieldKey, dropId);
+    const saveBtn = input.closest('.ac-wrap, .ac-wrap-textarea')?.querySelector('.save-val-btn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const val = input.value;
+        if (!val.trim()) return;
+        savedValues[fieldKey] = await window.api.saveFieldValue(fieldKey, val);
+        flashSave(saveBtn);
+        toast(`Saved "${val.length > 30 ? val.slice(0,30)+'…' : val}"`, 'success', 1500);
+      });
+    }
+  });
+
+  await loadWatermarks();
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById(`panel-${item.dataset.panel}`).classList.add('active');
+  });
+});
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => {
+    el.style.animation = 'slideOut 0.2s ease forwards';
+    setTimeout(() => el.remove(), 200);
+  }, duration);
+}
+
+// ─── Images & Per-image state ─────────────────────────────────────────────────
+// Each image: { name, data, size, url, type, outputName, perMeta: {title} }
+// outputName = what file will be named in ZIP (starts as original name)
+// perMeta.title = this image's individual title
+
+let selectedIdx = -1;
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  handleFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', e => { handleFiles([...e.target.files]); e.target.value = ''; });
+
+function handleFiles(files) {
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+  if (!imageFiles.length) { toast('No image files found', 'error'); return; }
+  let added = 0;
+  let pending = imageFiles.length;
+  imageFiles.forEach(file => {
+    if (images.find(i => i.name === file.name)) { pending--; return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      const url = e.target.result;
+      images.push({
+        name: file.name,
+        outputName: file.name,          // editable output filename
+        data: url.split(',')[1],
+        size: file.size,
+        url,
+        type: file.type,
+        perMeta: { title: '' }          // per-image title
+      });
+      added++;
+      pending--;
+      if (pending === 0) {
+        // Auto-select first image if nothing selected
+        if (selectedIdx === -1 && images.length > 0) selectedIdx = 0;
+        renderImageList();
+        renderPerImageCard();
+        updateBulkRenameVisibility();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function splitExt(name) {
+  const dot = name.lastIndexOf('.');
+  if (dot < 1) return [name, ''];
+  return [name.slice(0, dot), name.slice(dot)]; // ['filename', '.jpg']
+}
+
+function renderImageList() {
+  const list = document.getElementById('image-list');
+  const badge = document.getElementById('file-count-label');
+  const exportBtn = document.getElementById('export-btn');
+  const listActions = document.getElementById('list-actions');
+  const selectAllBtn = document.getElementById('select-all-btn');
+
+  if (!images.length) {
+    list.innerHTML = '';
+    badge.textContent = '';
+    exportBtn.disabled = true;
+    listActions.style.display = 'none';
+    selectAllBtn.style.display = 'none';
+    document.getElementById('img-count').style.display = 'none';
+    selectedIdx = -1;
+    return;
+  }
+
+  const count = images.length;
+  badge.textContent = `· ${count} file${count > 1 ? 's' : ''}`;
+  document.getElementById('img-count').textContent = count;
+  document.getElementById('img-count').style.display = 'inline';
+  exportBtn.disabled = false;
+  selectAllBtn.style.display = 'inline';
+
+  list.innerHTML = images.map((img, i) => {
+    const [base, ext] = splitExt(img.outputName);
+    const isRenamed = img.outputName !== img.name;
+    const isSelected = i === selectedIdx;
+    return `
+    <div class="image-item${isSelected ? ' selected' : ''}" data-index="${i}" title="${escHtml(img.name)}">
+      <img class="image-thumb" src="${img.url}" alt="">
+      <div class="image-info" style="flex:1;min-width:0;">
+        <div class="image-output-name${isRenamed ? ' is-renamed' : ''}">${escHtml(img.outputName)}</div>
+        ${isRenamed ? `<div class="image-original">${escHtml(img.name)}</div>` : `<div class="image-size">${formatSize(img.size)}</div>`}
+        ${img.perMeta.title ? `<div style="font-family:var(--mono);font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">"${escHtml(img.perMeta.title)}"</div>` : ''}
+      </div>
+      <button class="image-remove" data-index="${i}" title="Remove">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l8 8M9 1l-8 8"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+
+  // Click to select
+  list.querySelectorAll('.image-item').forEach(item => {
+    item.addEventListener('click', e => {
+      if (e.target.closest('.image-remove')) return;
+      const idx = parseInt(item.dataset.index);
+      selectedIdx = idx;
+      renderImageList();
+      renderPerImageCard();
+    });
+  });
+
+  // Remove buttons
+  list.querySelectorAll('.image-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.index);
+      images.splice(idx, 1);
+      if (selectedIdx >= images.length) selectedIdx = images.length - 1;
+      renderImageList();
+      renderPerImageCard();
+      updateBulkRenameVisibility();
+    });
+  });
+
+  // Multi-select checkbox (shift/ctrl) — track selected set
+  listActions.style.display = selectedSet.size ? 'flex' : 'none';
+}
+
+// ─── Per-image card ────────────────────────────────────────────────────────────
+function renderPerImageCard() {
+  const card = document.getElementById('per-image-card');
+
+  if (selectedIdx < 0 || !images[selectedIdx]) {
+    card.className = 'per-image-card empty';
+    card.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:0.25"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+      <span>No image selected — click one in the list</span>`;
+    return;
+  }
+
+  const img = images[selectedIdx];
+  const [base, ext] = splitExt(img.outputName);
+  const [origBase] = splitExt(img.name);
+  const isRenamed = img.outputName !== img.name;
+
+  card.className = 'per-image-card';
+  card.innerHTML = `
+    <img class="pi-thumb" src="${img.url}" alt="">
+    <div class="pi-fields">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.08em;margin-bottom:2px;">
+        FILENAME
+        ${isRenamed ? `<span style="color:var(--accent)">RENAMED</span>` : ''}
+      </div>
+      <div class="pi-filename-row">
+        <input type="text" id="pi-filename-input" value="${escHtml(base)}" placeholder="${escHtml(origBase)}" style="font-family:var(--mono);font-size:12px;">
+        <span class="pi-ext">${escHtml(ext)}</span>
+        <button class="apply-all-btn" id="pi-reset-name-btn" title="Reset to original" style="${isRenamed ? '' : 'opacity:0.3;'}">↺</button>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.08em;margin-top:6px;margin-bottom:2px;">TITLE <span style="font-weight:normal;opacity:0.6;">— overrides shared title for this image only</span></div>
+      <div class="pi-title-row">
+        <input type="text" id="pi-title-input" value="${escHtml(img.perMeta.title)}" placeholder="Image-specific title (optional)">
+        <button class="apply-all-btn" id="pi-title-apply-all-btn" title="Apply this title to all images">Apply all</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">
+          ${selectedIdx + 1} / ${images.length}
+        </span>
+        ${selectedIdx > 0 ? `<button class="apply-all-btn" id="pi-prev-btn">◀ Prev</button>` : ''}
+        ${selectedIdx < images.length - 1 ? `<button class="apply-all-btn" id="pi-next-btn">Next ▶</button>` : ''}
+      </div>
+    </div>`;
+
+  // Live update filename
+  const fnInput = document.getElementById('pi-filename-input');
+  fnInput.addEventListener('input', () => {
+    const newBase = fnInput.value.trim();
+    images[selectedIdx].outputName = newBase ? newBase + ext : img.name;
+    renderImageList();
+    // Re-render card without full replace to keep focus
+    const resetBtn = document.getElementById('pi-reset-name-btn');
+    if (resetBtn) resetBtn.style.opacity = images[selectedIdx].outputName !== img.name ? '1' : '0.3';
+    updateBulkRenameVisibility();
+  });
+
+  // Reset filename
+  document.getElementById('pi-reset-name-btn').addEventListener('click', () => {
+    images[selectedIdx].outputName = images[selectedIdx].name;
+    renderImageList();
+    renderPerImageCard();
+  });
+
+  // Live update title
+  const titleInput = document.getElementById('pi-title-input');
+  titleInput.addEventListener('input', () => {
+    images[selectedIdx].perMeta.title = titleInput.value;
+    renderImageList(); // refresh title preview in list
+  });
+
+  // Apply title to all
+  document.getElementById('pi-title-apply-all-btn').addEventListener('click', () => {
+    const val = titleInput.value;
+    images.forEach(img => { img.perMeta.title = val; });
+    renderImageList();
+    toast(`Title "${val.slice(0,30)}" applied to all ${images.length} images`, 'success', 2000);
+  });
+
+  // Prev / Next navigation
+  document.getElementById('pi-prev-btn')?.addEventListener('click', () => {
+    selectedIdx = Math.max(0, selectedIdx - 1);
+    renderImageList();
+    renderPerImageCard();
+    // Scroll selected into view
+    document.querySelector('.image-item.selected')?.scrollIntoView({ block: 'nearest' });
+  });
+  document.getElementById('pi-next-btn')?.addEventListener('click', () => {
+    selectedIdx = Math.min(images.length - 1, selectedIdx + 1);
+    renderImageList();
+    renderPerImageCard();
+    document.querySelector('.image-item.selected')?.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+// ─── Bulk rename ───────────────────────────────────────────────────────────────
+let bulkRenameOpen = false;
+let bulkRenameMode = 'sequential';
+
+function updateBulkRenameVisibility() {
+  const sec = document.getElementById('bulk-rename-section');
+  sec.style.display = images.length > 1 ? 'block' : 'none';
+}
+
+document.getElementById('bulk-rename-toggle-btn').addEventListener('click', () => {
+  bulkRenameOpen = !bulkRenameOpen;
+  document.getElementById('bulk-rename-panel').style.display = bulkRenameOpen ? 'block' : 'none';
+  document.getElementById('bulk-rename-toggle-btn').textContent = bulkRenameOpen ? '▴ COLLAPSE' : '▾ EXPAND';
+  if (bulkRenameOpen) { updateSeqPreview(); updateManualList(); }
+});
+
+document.querySelectorAll('.bulk-rename-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.bulk-rename-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    bulkRenameMode = tab.dataset.mode;
+    document.getElementById('rename-mode-sequential').style.display = bulkRenameMode === 'sequential' ? 'block' : 'none';
+    document.getElementById('rename-mode-manual').style.display = bulkRenameMode === 'manual' ? 'block' : 'none';
+    if (bulkRenameMode === 'sequential') updateSeqPreview();
+    else updateManualList();
+  });
+});
+
+function getSeqNames() {
+  const prefix = document.getElementById('seq-prefix').value;
+  const suffix = document.getElementById('seq-suffix').value;
+  const start = parseInt(document.getElementById('seq-start').value) || 1;
+  const pad = parseInt(document.getElementById('seq-pad').value) || 2;
+  return images.map((img, i) => {
+    const [, ext] = splitExt(img.name);
+    const num = String(start + i).padStart(pad, '0');
+    return `${prefix}${num}${suffix}${ext}`;
+  });
+}
+
+function updateSeqPreview() {
+  const names = getSeqNames();
+  document.getElementById('seq-preview').innerHTML = names.map((n, i) =>
+    `<div>${escHtml(images[i].name)} → <span style="color:var(--accent)">${escHtml(n)}</span></div>`
+  ).join('');
+}
+
+// Live preview on seq input changes
+['seq-prefix','seq-suffix','seq-start','seq-pad'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', () => {
+    if (bulkRenameOpen && bulkRenameMode === 'sequential') updateSeqPreview();
+  });
+});
+
+document.getElementById('apply-sequential-btn').addEventListener('click', () => {
+  const names = getSeqNames();
+  names.forEach((n, i) => { images[i].outputName = n; });
+  renderImageList();
+  renderPerImageCard();
+  toast(`Sequential names applied to ${images.length} files`, 'success', 2000);
+});
+
+function updateManualList() {
+  const container = document.getElementById('manual-rename-list');
+  container.innerHTML = images.map((img, i) => {
+    const [base, ext] = splitExt(img.outputName);
+    return `
+    <div class="manual-rename-row">
+      <img class="mr-thumb" src="${img.url}" alt="">
+      <input type="text" value="${escHtml(base)}" data-index="${i}" placeholder="${escHtml(splitExt(img.name)[0])}">
+      <span class="mr-ext">${escHtml(ext)}</span>
+    </div>`;
+  }).join('');
+  container.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const i = parseInt(inp.dataset.index);
+      const [, ext] = splitExt(images[i].name);
+      const val = inp.value.trim();
+      images[i].outputName = val ? val + ext : images[i].name;
+    });
+  });
+}
+
+document.getElementById('apply-manual-btn').addEventListener('click', () => {
+  // Values already live-updated above — just refresh the list
+  renderImageList();
+  renderPerImageCard();
+  toast('Filenames applied', 'success', 1500);
+});
+
+// ─── Multi-select (checkbox) ──────────────────────────────────────────────────
+let selectedSet = new Set();
+
+document.getElementById('select-all-btn').addEventListener('click', () => {
+  if (selectedSet.size === images.length) {
+    selectedSet.clear();
+  } else {
+    images.forEach((_, i) => selectedSet.add(i));
+  }
+  renderImageList();
+});
+
+document.getElementById('remove-selected-btn').addEventListener('click', () => {
+  const toRemove = [...selectedSet].sort((a,b) => b - a);
+  toRemove.forEach(i => images.splice(i, 1));
+  selectedSet.clear();
+  if (selectedIdx >= images.length) selectedIdx = images.length - 1;
+  renderImageList();
+  renderPerImageCard();
+  updateBulkRenameVisibility();
+});
+
+document.getElementById('clear-all-btn').addEventListener('click', () => {
+  images = []; selectedSet.clear(); selectedIdx = -1;
+  renderImageList(); renderPerImageCard(); updateBulkRenameVisibility();
+});
+
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+// ─── Custom Fields ─────────────────────────────────────────────────────────────
+let customFields = [];
+
+function renderCustomFields() {
+  const container = document.getElementById('custom-fields');
+  container.innerHTML = customFields.map((f, i) => `
+    <div class="custom-field">
+      <input type="text" class="key" placeholder="Field name" value="${escHtml(f.key)}" data-index="${i}" data-role="key">
+      <div class="ac-wrap" style="flex:1; position:relative;">
+        <input type="text" class="val" placeholder="Value" value="${escHtml(f.value)}" data-index="${i}" data-role="val"
+          style="width:100%; padding-right:28px;">
+        <button class="save-val-btn" data-custom-index="${i}" title="Save this value" style="z-index:1;">
+          <svg viewBox="0 0 11 13" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M1 1h9v11l-4.5-3L1 12V1z"/></svg>
+        </button>
+        <div class="ac-dropdown" id="ac-custom-${i}"></div>
+      </div>
+      <button class="remove-btn" data-index="${i}">
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M1 1l6 6M7 1L1 7"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const i = parseInt(inp.dataset.index);
+      const role = inp.dataset.role;
+      if (role) customFields[i][role] = inp.value;
+      // If it's a value field, trigger autocomplete
+      if (role === 'val') {
+        const fieldKey = `custom_${customFields[i].key || `_idx${i}`}`;
+        triggerAC(inp, fieldKey, `ac-custom-${i}`);
+      }
+    });
+    // On key input focus, show saved values
+    if (inp.dataset.role === 'val') {
+      inp.addEventListener('focus', () => {
+        const i = parseInt(inp.dataset.index);
+        const fieldKey = `custom_${customFields[i].key || `_idx${i}`}`;
+        triggerAC(inp, fieldKey, `ac-custom-${i}`);
+      });
+    }
+  });
+
+  // Save buttons for custom fields
+  container.querySelectorAll('[data-custom-index]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const i = parseInt(btn.dataset.customIndex);
+      const val = customFields[i].value;
+      const key = customFields[i].key || `_idx${i}`;
+      if (!val.trim()) return;
+      const fieldKey = `custom_${key}`;
+      savedValues[fieldKey] = await window.api.saveFieldValue(fieldKey, val);
+      flashSave(btn);
+      toast(`Saved "${val}"`, 'success', 1500);
+    });
+  });
+
+  container.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      customFields.splice(parseInt(btn.dataset.index), 1);
+      renderCustomFields();
+    });
+  });
+}
+
+document.getElementById('add-custom-field').addEventListener('click', () => {
+  customFields.push({ key: '', value: '' });
+  renderCustomFields();
+  // Focus first empty key
+  const inputs = document.querySelectorAll('#custom-fields .key');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+});
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ─── Watermark selector (process panel) ───────────────────────────────────────
+async function loadWatermarks() {
+  watermarks = await window.api.getWatermarks();
+  updateWmSelect();
+  updateWmCount();
+  renderWmLibrary();
+}
+
+function updateWmSelect() {
+  const sel = document.getElementById('wm-select');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— None —</option>' +
+    watermarks.map(wm => `<option value="${wm.id}">${escHtml(wm.name)}</option>`).join('');
+  if (current && watermarks.find(w => w.id === current)) sel.value = current;
+}
+
+function updateWmCount() {
+  const badge = document.getElementById('wm-count');
+  if (watermarks.length) {
+    badge.textContent = watermarks.length;
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+document.getElementById('wm-select').addEventListener('change', async e => {
+  const id = e.target.value;
+  const opacityRow = document.getElementById('opacity-row');
+  const warning = document.getElementById('wm-no-positions-warning');
+  opacityRow.style.display = id ? 'flex' : 'none';
+  if (id) {
+    const positions = await window.api.getWatermarkPositions(id);
+    const hasPositions = Object.keys(positions).length > 0;
+    warning.style.display = hasPositions ? 'none' : 'block';
+  } else {
+    warning.style.display = 'none';
+  }
+});
+
+document.getElementById('wm-opacity').addEventListener('input', e => {
+  document.getElementById('opacity-val').textContent = `${e.target.value}%`;
+});
+
+// ─── Export ────────────────────────────────────────────────────────────────────
+document.getElementById('export-btn').addEventListener('click', async () => {
+  if (!images.length) return;
+
+  // Build shared metadata from the global fields
+  const sharedMeta = {
+    author:      document.getElementById('meta-author').value.trim(),
+    copyright:   document.getElementById('meta-copyright').value.trim(),
+    software:    document.getElementById('meta-software').value.trim(),
+    description: document.getElementById('meta-description').value.trim(),
+    keywords:    document.getElementById('meta-keywords').value.trim(),
+    comment:     document.getElementById('meta-comment').value.trim(),
+    custom:      customFields.filter(f => f.key.trim())
+  };
+
+  // Each image gets its own metadata object: shared fields + per-image title
+  const imagesPayload = images.map(img => ({
+    name: img.outputName,          // this is the filename in the ZIP
+    data: img.data,
+    metadata: {
+      ...sharedMeta,
+      title: img.perMeta.title || ''  // per-image title overrides
+    }
+  }));
+
+  const watermarkId = document.getElementById('wm-select').value || null;
+  const opacity = parseInt(document.getElementById('wm-opacity').value) || 80;
+  const zipName = document.getElementById('zip-name').value.trim() || 'processed-images';
+  const strip = document.getElementById('strip-toggle').checked;
+  const folderInZip = document.getElementById('setting-folder-in-zip').checked;
+
+  document.getElementById('progress-overlay').classList.add('show');
+  document.getElementById('progress-bar').style.width = '20%';
+  document.getElementById('progress-count').textContent = `Processing ${images.length} image${images.length > 1 ? 's' : ''}...`;
+
+  try {
+    const zipData = await window.api.processImages({
+      images: imagesPayload,
+      watermarkId,
+      opacity,
+      strip,
+      folderInZip,
+      zipFolderName: zipName
+    });
+
+    document.getElementById('progress-bar').style.width = '80%';
+    document.getElementById('progress-count').textContent = 'Saving ZIP...';
+
+    const savedName = await window.api.saveZip(zipData, zipName);
+    document.getElementById('progress-overlay').classList.remove('show');
+
+    if (savedName) {
+      toast(`Saved: ${savedName}.zip`, 'success');
+      const hint = document.getElementById('last-name-hint');
+      hint.textContent = `Last: ${savedName}.zip`;
+      hint.style.display = 'block';
+      document.getElementById('zip-name').value = savedName;
+    }
+  } catch (err) {
+    document.getElementById('progress-overlay').classList.remove('show');
+    toast(`Error: ${err.message}`, 'error', 5000);
+    console.error(err);
+  }
+});
+
+// ─── Watermarks Library ────────────────────────────────────────────────────────
+document.getElementById('add-wm-btn').addEventListener('click', async () => {
+  const result = await window.api.openWatermarkDialog();
+  if (!result) return;
+  watermarks.push(result);
+  updateWmSelect();
+  updateWmCount();
+  renderWmLibrary();
+  toast(`Watermark "${result.name}" added`, 'success');
+  // Auto-select in editor
+  selectWatermarkForEdit(result.id);
+});
+
+function renderWmLibrary() {
+  const list = document.getElementById('wm-list');
+  const empty = document.getElementById('wm-empty');
+  if (!watermarks.length) {
+    list.innerHTML = '';
+    list.appendChild(empty);
+    empty.style.display = 'flex';
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = watermarks.map(wm => `
+    <div class="wm-card ${selectedWatermarkId === wm.id ? 'selected' : ''}" data-id="${wm.id}">
+      <div class="wm-card-preview">
+        <img src="${wm.data}" alt="${escHtml(wm.name)}">
+      </div>
+      <div class="wm-card-name-row">
+        <span class="wm-card-name" data-id="${wm.id}" title="Double-click to rename">${escHtml(wm.name)}</span>
+        <button class="btn btn-danger btn-sm" data-delete="${wm.id}" style="padding:3px 7px;font-size:9px">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.wm-card').forEach(card => {
+    card.addEventListener('click', e => {
+      if (e.target.dataset.delete) return;
+      selectWatermarkForEdit(card.dataset.id);
+    });
+  });
+
+  list.querySelectorAll('[data-delete]').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const id = btn.dataset.delete;
+      const wm = watermarks.find(w => w.id === id);
+      if (!confirm(`Delete watermark "${wm?.name}"?`)) return;
+      await window.api.deleteWatermark(id);
+      watermarks = watermarks.filter(w => w.id !== id);
+      if (selectedWatermarkId === id) {
+        selectedWatermarkId = null;
+        document.getElementById('wm-select-hint').style.display = 'flex';
+        document.getElementById('wm-ratios-editor').style.display = 'none';
+      }
+      updateWmSelect();
+      updateWmCount();
+      renderWmLibrary();
+      toast('Watermark deleted', 'info');
+    });
+  });
+
+  // Double-click to rename
+  list.querySelectorAll('.wm-card-name').forEach(nameEl => {
+    nameEl.addEventListener('dblclick', () => {
+      const id = nameEl.dataset.id;
+      const current = nameEl.textContent;
+      const input = document.createElement('input');
+      input.className = 'wm-card-name-input';
+      input.value = current;
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+      const commit = async () => {
+        const newName = input.value.trim() || current;
+        await window.api.renameWatermark(id, newName);
+        watermarks = watermarks.map(w => w.id === id ? { ...w, name: newName } : w);
+        updateWmSelect();
+        renderWmLibrary();
+      };
+      input.addEventListener('blur', commit);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); if (e.key === 'Escape') { input.value = current; input.blur(); } });
+    });
+  });
+}
+
+async function selectWatermarkForEdit(id) {
+  selectedWatermarkId = id;
+  const wm = watermarks.find(w => w.id === id);
+  if (!wm) return;
+
+  document.getElementById('wm-editor-name').textContent = wm.name;
+  document.getElementById('wm-select-hint').style.display = 'none';
+  document.getElementById('wm-ratios-editor').style.display = 'block';
+
+  // Load existing positions
+  currentPositions = await window.api.getWatermarkPositions(id);
+
+  renderWmLibrary();
+  buildRatiosEditor(wm);
+}
+
+// ─── Ratios Editor ─────────────────────────────────────────────────────────────
+function buildRatiosEditor(wm) {
+  const grid = document.getElementById('ratios-grid');
+  grid.innerHTML = '';
+  canvasStates = {};
+
+  RATIOS.forEach(ratio => {
+    const MAX_H = 140;
+    const MAX_W = 180;
+    let cw, ch;
+    const aspect = ratio.w / ratio.h;
+    if (aspect >= 1) {
+      cw = MAX_W;
+      ch = Math.round(MAX_W / aspect);
+      if (ch > MAX_H) { ch = MAX_H; cw = Math.round(MAX_H * aspect); }
+    } else {
+      ch = MAX_H;
+      cw = Math.round(MAX_H * aspect);
+      if (cw > MAX_W) { cw = MAX_W; ch = Math.round(MAX_W / aspect); }
+    }
+
+    const card = document.createElement('div');
+    card.className = 'ratio-card';
+    card.innerHTML = `
+      <div class="ratio-card-header">
+        <span class="ratio-label">${ratio.id}</span>
+        <span class="ratio-saved" id="saved-${ratio.id.replace(':','-')}" style="display:${currentPositions[ratio.id] ? 'inline' : 'none'}">✓ saved</span>
+      </div>
+      <div class="ratio-canvas-wrap">
+        <canvas class="ratio-canvas" id="canvas-${ratio.id.replace(':','-')}" width="${cw}" height="${ch}"></canvas>
+      </div>
+      <div class="ratio-actions">
+        <button class="lock-btn locked" id="lock-${ratio.id.replace(':','-')}" title="Lock/unlock watermark aspect ratio">
+          <svg viewBox="0 0 9 11" fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="1" y="4.5" width="7" height="5.5" rx="0.8"/>
+            <path d="M2.5 4.5V3a2 2 0 014 0v1.5"/>
+          </svg>
+          LOCK RATIO
+        </button>
+        <span class="spacer"></span>
+        <button class="btn btn-ghost btn-sm" data-reset="${ratio.id}">Reset</button>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    const lockBtn = card.querySelector(`#lock-${ratio.id.replace(':','-')}`);
+    lockBtn.addEventListener('click', () => {
+      const isLocked = lockBtn.classList.toggle('locked');
+      lockBtn.innerHTML = isLocked
+        ? `<svg viewBox="0 0 9 11" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1" y="4.5" width="7" height="5.5" rx="0.8"/><path d="M2.5 4.5V3a2 2 0 014 0v1.5"/></svg> LOCK RATIO`
+        : `<svg viewBox="0 0 9 11" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1" y="4.5" width="7" height="5.5" rx="0.8"/><path d="M2.5 4.5V3a2 2 0 014 0" stroke-dasharray="2 1.5"/></svg> FREE`;
+      if (canvasStates[ratio.id]) canvasStates[ratio.id].lockAspect = isLocked;
+    });
+
+    card.querySelector(`[data-reset]`).addEventListener('click', () => {
+      delete currentPositions[ratio.id];
+      const savedBadge = document.getElementById(`saved-${ratio.id.replace(':','-')}`);
+      if (savedBadge) savedBadge.style.display = 'none';
+      initCanvas(ratio, wm, cw, ch);
+    });
+
+    initCanvas(ratio, wm, cw, ch);
+  });
+}
+
+function initCanvas(ratio, wm, cw, ch) {
+  const id = ratio.id.replace(':','-');
+  const canvas = document.getElementById(`canvas-${id}`);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const wmImg = new Image();
+  wmImg.src = wm.data;
+
+  // Default or saved position (fractions 0-1)
+  let pos = currentPositions[ratio.id]
+    ? { ...currentPositions[ratio.id] }
+    : { x: 0.05, y: 0.05, w: 0.25, h: 0.25 };
+
+  // Normalize h based on wm aspect ratio if default
+  if (!currentPositions[ratio.id] && wmImg.naturalWidth && wmImg.naturalHeight) {
+    const wmAspect = wmImg.naturalWidth / wmImg.naturalHeight;
+    pos.h = pos.w / wmAspect * (cw / ch);
+  }
+
+  canvasStates[ratio.id] = { pos, dragging: false, resizing: false, handle: null, startMX: 0, startMY: 0, startPos: null, lockAspect: true };
+  const state = canvasStates[ratio.id];
+
+  function draw() {
+    ctx.clearRect(0, 0, cw, ch);
+
+    // Background grid
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const px = pos.x * cw, py = pos.y * ch;
+    const pw = pos.w * cw, ph = pos.h * ch;
+
+    // Watermark image
+    if (wmImg.complete && wmImg.naturalWidth) {
+      ctx.globalAlpha = 0.7;
+      ctx.drawImage(wmImg, px, py, pw, ph);
+      ctx.globalAlpha = 1;
+    }
+
+    // Selection rect
+    ctx.strokeStyle = '#e8ff47';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 2]);
+    ctx.strokeRect(px, py, pw, ph);
+    ctx.setLineDash([]);
+
+    // Resize handle (bottom-right)
+    const hx = px + pw - 4, hy = py + ph - 4;
+    ctx.fillStyle = '#e8ff47';
+    ctx.fillRect(hx, hy, 8, 8);
+  }
+
+  wmImg.onload = () => {
+    // Always correct h to natural aspect ratio on first load (lock starts enabled)
+    if (!currentPositions[ratio.id] && wmImg.naturalWidth && wmImg.naturalHeight) {
+      const wmNaturalAspect = wmImg.naturalWidth / wmImg.naturalHeight;
+      pos.h = (pos.w * cw) / wmNaturalAspect / ch;
+    }
+    draw();
+  };
+
+  setTimeout(draw, 50);
+
+  function getCanvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * (cw / rect.width), y: (e.clientY - rect.top) * (ch / rect.height) };
+  }
+
+  function isInHandle(mx, my) {
+    const px = pos.x * cw, py = pos.y * ch;
+    const pw = pos.w * cw, ph = pos.h * ch;
+    const hx = px + pw - 4, hy = py + ph - 4;
+    return mx >= hx && mx <= hx + 8 && my >= hy && my <= hy + 8;
+  }
+
+  function isInRect(mx, my) {
+    const px = pos.x * cw, py = pos.y * ch;
+    return mx >= px && mx <= px + pos.w * cw && my >= py && my <= py + pos.h * ch;
+  }
+
+  canvas.addEventListener('mousedown', e => {
+    const { x: mx, y: my } = getCanvasPos(e);
+    state.startMX = mx; state.startMY = my;
+    state.startPos = { ...pos };
+    if (isInHandle(mx, my)) {
+      state.resizing = true;
+    } else if (isInRect(mx, my)) {
+      state.dragging = true;
+      canvas.style.cursor = 'grabbing';
+    }
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    const { x: mx, y: my } = getCanvasPos(e);
+    if (!state.dragging && !state.resizing) {
+      canvas.style.cursor = isInHandle(mx, my) ? 'se-resize' : isInRect(mx, my) ? 'grab' : 'crosshair';
+      return;
+    }
+    const dx = (mx - state.startMX) / cw;
+    const dy = (my - state.startMY) / ch;
+    if (state.dragging) {
+      pos.x = Math.max(0, Math.min(1 - pos.w, state.startPos.x + dx));
+      pos.y = Math.max(0, Math.min(1 - pos.h, state.startPos.y + dy));
+    } else if (state.resizing) {
+      const newW = Math.max(0.05, Math.min(1 - pos.x, state.startPos.w + dx));
+      if (state.lockAspect && wmImg.naturalWidth && wmImg.naturalHeight) {
+        // Maintain watermark's natural aspect ratio, accounting for canvas pixel dimensions
+        const wmNaturalAspect = wmImg.naturalWidth / wmImg.naturalHeight;
+        // w/h in fraction-space must map to same pixel ratio: (w*cw)/(h*ch) = wmNaturalAspect
+        const newH = (newW * cw) / wmNaturalAspect / ch;
+        pos.w = newW;
+        pos.h = Math.max(0.05, Math.min(1 - pos.y, newH));
+      } else {
+        pos.w = newW;
+        pos.h = Math.max(0.05, Math.min(1 - pos.y, state.startPos.h + dy));
+      }
+    }
+    draw();
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    state.dragging = false;
+    state.resizing = false;
+    canvas.style.cursor = 'crosshair';
+    currentPositions[ratio.id] = { ...pos };
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    if (state.dragging || state.resizing) {
+      state.dragging = false;
+      state.resizing = false;
+      currentPositions[ratio.id] = { ...pos };
+    }
+  });
+}
+
+document.getElementById('save-all-positions-btn').addEventListener('click', async () => {
+  if (!selectedWatermarkId) return;
+  await window.api.saveWatermarkPositions(selectedWatermarkId, currentPositions);
+  // Update saved badges
+  RATIOS.forEach(r => {
+    const badge = document.getElementById(`saved-${r.id.replace(':','-')}`);
+    if (badge) badge.style.display = currentPositions[r.id] ? 'inline' : 'none';
+  });
+  toast('All positions saved', 'success');
+  // Refresh warning in process panel
+  const sel = document.getElementById('wm-select');
+  if (sel.value === selectedWatermarkId) {
+    document.getElementById('wm-no-positions-warning').style.display = 'none';
+  }
+});
+
+document.getElementById('reset-all-positions-btn').addEventListener('click', () => {
+  if (!selectedWatermarkId) return;
+  currentPositions = {};
+  const wm = watermarks.find(w => w.id === selectedWatermarkId);
+  if (wm) buildRatiosEditor(wm);
+  toast('Positions reset', 'info');
+});
+
+// ─── Autocomplete Engine ──────────────────────────────────────────────────────
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.ac-dropdown.open').forEach(d => d.classList.remove('open'));
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.ac-wrap') && !e.target.closest('.ac-wrap-textarea')) closeAllDropdowns();
+});
+
+function highlightMatch(text, query) {
+  if (!query) return escHtml(text);
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return escHtml(text);
+  return escHtml(text.slice(0, idx))
+    + `<span class="ac-match">${escHtml(text.slice(idx, idx + query.length))}</span>`
+    + escHtml(text.slice(idx + query.length));
+}
+
+function renderDropdown(dropEl, input, fieldKey, query) {
+  const all = savedValues[fieldKey] || [];
+  const filtered = query
+    ? all.filter(v => v.toLowerCase().includes(query.toLowerCase()))
+    : all;
+
+  if (!filtered.length) {
+    if (!query && !all.length) { dropEl.classList.remove('open'); return; }
+    dropEl.innerHTML = `<div class="ac-empty">${all.length ? 'No matches' : 'No saved values yet — type and click 🔖'}</div>`;
+    dropEl.classList.add('open');
+    return;
+  }
+
+  dropEl.innerHTML = filtered.map((v, i) => `
+    <div class="ac-item" data-value="${escHtml(v)}" data-idx="${i}">
+      <span class="ac-item-text">${highlightMatch(v, query)}</span>
+      <button class="ac-item-del" data-del="${escHtml(v)}" title="Remove saved value">
+        <svg viewBox="0 0 8 8" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M1 1l6 6M7 1L1 7"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+
+  // Click to fill
+  dropEl.querySelectorAll('.ac-item').forEach(item => {
+    item.addEventListener('mousedown', e => {
+      if (e.target.closest('.ac-item-del')) return;
+      e.preventDefault();
+      input.value = item.dataset.value;
+      input.dispatchEvent(new Event('input'));
+      dropEl.classList.remove('open');
+    });
+  });
+
+  // Delete saved value
+  dropEl.querySelectorAll('.ac-item-del').forEach(btn => {
+    btn.addEventListener('mousedown', async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const val = btn.dataset.del;
+      savedValues[fieldKey] = await window.api.deleteSavedValue(fieldKey, val);
+      toast(`Removed saved value`, 'info', 1500);
+      renderDropdown(dropEl, input, fieldKey, input.value);
+    });
+  });
+
+  dropEl.classList.add('open');
+}
+
+// Keyboard nav
+function setupKeyNav(input, dropEl) {
+  input.addEventListener('keydown', e => {
+    if (!dropEl.classList.contains('open')) return;
+    const items = [...dropEl.querySelectorAll('.ac-item')];
+    const focused = dropEl.querySelector('.ac-item.focused');
+    let idx = focused ? items.indexOf(focused) : -1;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (focused) focused.classList.remove('focused');
+      idx = (idx + 1) % items.length;
+      items[idx]?.classList.add('focused');
+      items[idx]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (focused) focused.classList.remove('focused');
+      idx = (idx - 1 + items.length) % items.length;
+      items[idx]?.classList.add('focused');
+      items[idx]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && focused) {
+      e.preventDefault();
+      input.value = focused.dataset.value;
+      input.dispatchEvent(new Event('input'));
+      dropEl.classList.remove('open');
+    } else if (e.key === 'Escape') {
+      dropEl.classList.remove('open');
+    } else if (e.key === 'Tab') {
+      // Tab completes if one item focused
+      if (focused) {
+        input.value = focused.dataset.value;
+        input.dispatchEvent(new Event('input'));
+      }
+      dropEl.classList.remove('open');
+    }
+  });
+}
+
+function attachAutocomplete(input, fieldKey, dropId) {
+  const dropEl = document.getElementById(dropId);
+  if (!dropEl) return;
+
+  const handler = () => {
+    renderDropdown(dropEl, input, fieldKey, input.value);
+  };
+  const focusHandler = () => {
+    renderDropdown(dropEl, input, fieldKey, input.value);
+  };
+
+  // Store refs for detach
+  input._acHandler = handler;
+  input._acFocusHandler = focusHandler;
+
+  input.addEventListener('input', handler);
+  input.addEventListener('focus', focusHandler);
+  setupKeyNav(input, dropEl);
+}
+
+function triggerAC(input, fieldKey, dropId) {
+  const dropEl = document.getElementById(dropId);
+  if (!dropEl) return;
+  renderDropdown(dropEl, input, fieldKey, input.value);
+  setupKeyNav(input, dropEl);
+}
+
+function flashSave(btn) {
+  btn.classList.add('saved-flash');
+  setTimeout(() => btn.classList.remove('saved-flash'), 800);
+}
+
+// ─── Metadata Viewer ──────────────────────────────────────────────────────────
+
+let viewerImages = []; // { name, data, url }
+let viewerResults = []; // analysis results
+let viewerActiveIdx = 0;
+
+const viewerDrop = document.getElementById('viewer-drop-zone');
+const viewerInput = document.getElementById('viewer-file-input');
+
+viewerDrop.addEventListener('dragover', e => { e.preventDefault(); viewerDrop.classList.add('drag-over'); });
+viewerDrop.addEventListener('dragleave', () => viewerDrop.classList.remove('drag-over'));
+viewerDrop.addEventListener('drop', e => {
+  e.preventDefault(); viewerDrop.classList.remove('drag-over');
+  handleViewerFiles([...e.dataTransfer.files]);
+});
+viewerInput.addEventListener('change', e => handleViewerFiles([...e.target.files]));
+
+document.getElementById('viewer-clear-btn').addEventListener('click', () => {
+  viewerImages = []; viewerResults = [];
+  renderViewerFileList();
+  document.getElementById('viewer-results-content').innerHTML = '';
+  document.getElementById('viewer-empty-state-placeholder') && null;
+  showViewerEmpty();
+  document.getElementById('viewer-export-report-btn').style.display = 'none';
+  document.getElementById('viewer-result-label').textContent = '';
+});
+
+function handleViewerFiles(files) {
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+  if (!imageFiles.length) { toast('No image files found', 'error'); return; }
+  viewerResults = []; // reset results when new files added
+  imageFiles.forEach(file => {
+    if (viewerImages.find(i => i.name === file.name)) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const url = e.target.result;
+      const data = url.split(',')[1];
+      viewerImages.push({ name: file.name, data, url, size: file.size });
+      renderViewerFileList();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderViewerFileList() {
+  const list = document.getElementById('viewer-file-list');
+  const analyseBtn = document.getElementById('viewer-analyse-btn');
+  analyseBtn.disabled = viewerImages.length === 0;
+
+  list.innerHTML = viewerImages.map((img, i) => {
+    const result = viewerResults[i];
+    const statusClass = !result ? 'no-meta' : result.error ? 'error' : Object.keys(result.exif || {}).length > 0 ? 'has-meta' : 'no-meta';
+    return `
+    <div class="viewer-file-item ${viewerActiveIdx === i && viewerResults.length ? 'active' : ''}" data-idx="${i}">
+      <img class="vf-thumb" src="${img.url}" alt="">
+      <span class="vf-name" title="${escHtml(img.name)}">${escHtml(img.name)}</span>
+      <span class="vf-status ${statusClass}"></span>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.viewer-file-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = parseInt(item.dataset.idx);
+      if (viewerResults[idx]) showViewerResult(idx);
+    });
+  });
+}
+
+function showViewerEmpty() {
+  const content = document.getElementById('viewer-results-content');
+  content.innerHTML = `<div class="viewer-empty" id="viewer-empty-state">
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2">
+      <path d="M8 12h32M8 20h24M8 28h16M8 36h10"/>
+      <circle cx="37" cy="34" r="7"/><path d="M42 39l4 4"/>
+    </svg>
+    <p>Drop images in the left panel<br>and click Analyse All to read<br>their original metadata.</p>
+  </div>`;
+}
+
+document.getElementById('viewer-analyse-btn').addEventListener('click', async () => {
+  if (!viewerImages.length) return;
+  const btn = document.getElementById('viewer-analyse-btn');
+  btn.disabled = true;
+  btn.textContent = 'Analysing…';
+
+  try {
+    viewerResults = await window.api.readMetadata(viewerImages);
+    viewerActiveIdx = 0;
+    renderViewerFileList();
+    showViewerResult(0);
+    document.getElementById('viewer-export-report-btn').style.display = 'inline-flex';
+    document.getElementById('viewer-result-label').textContent = `· ${viewerResults.length} file${viewerResults.length > 1 ? 's' : ''}`;
+  } catch (e) {
+    toast('Analysis error: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Analyse All';
+});
+
+function showViewerResult(idx) {
+  viewerActiveIdx = idx;
+  renderViewerFileList();
+
+  const result = viewerResults[idx];
+  const img = viewerImages[idx];
+  if (!result) return;
+
+  const content = document.getElementById('viewer-results-content');
+
+  if (result.error) {
+    content.innerHTML = `<div class="meta-result">
+      <div class="meta-result-header">
+        <img class="meta-result-thumb" src="${img.url}">
+        <div class="meta-result-file">
+          <div class="meta-result-name">${escHtml(result.name)}</div>
+          <div class="meta-result-dims" style="color:var(--red)">Error: ${escHtml(result.error)}</div>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
+
+  const exifEntries = Object.entries(result.exif || {});
+  const orient = { 1:'Normal', 2:'Flip H', 3:'Rotate 180°', 4:'Flip V', 5:'Transpose', 6:'Rotate 90° CW', 7:'Transverse', 8:'Rotate 90° CCW' };
+  const resUnit = { 1:'No unit', 2:'inch', 3:'cm' };
+
+  // File info rows
+  const fileRows = [
+    ['Format', result.format?.toUpperCase()],
+    ['Dimensions', result.width && result.height ? `${result.width} × ${result.height} px` : null],
+    ['Color space', result.space],
+    ['Channels', result.channels],
+    ['Bit depth', result.depth],
+    ['Density', result.density ? `${result.density} dpi` : null],
+    ['Orientation', result.orientation ? (orient[result.orientation] || result.orientation) : null],
+    ['Alpha channel', result.hasAlpha ? 'Yes' : 'No'],
+    ['ICC profile', result.hasProfile ? 'Embedded' : 'None'],
+    ['File size', formatViewerSize(result.rawSize)],
+  ].filter(([,v]) => v !== null && v !== undefined);
+
+  const exifHtml = exifEntries.length
+    ? exifEntries.map(([k, v]) => `<tr><td>${escHtml(k)}</td><td>${escHtml(String(v))}</td></tr>`).join('')
+    : `<tr class="meta-empty-row"><td colspan="2">No EXIF metadata found in this file</td></tr>`;
+
+  const hasData = result.hasExif || result.hasIcc || result.hasIptc || result.hasXmp;
+
+  content.innerHTML = `
+    <div class="meta-result">
+      <div class="meta-result-header">
+        <img class="meta-result-thumb" src="${img.url}" alt="">
+        <div class="meta-result-file">
+          <div class="meta-result-name">${escHtml(result.name)}</div>
+          <div class="meta-result-dims">${result.width} × ${result.height} · ${result.format?.toUpperCase()} · ${formatViewerSize(result.rawSize)}</div>
+        </div>
+      </div>
+      <div class="meta-chips">
+        <span class="meta-chip ${result.hasExif ? 'chip-has' : 'chip-none'}">EXIF ${result.hasExif ? '✓' : '✗'}</span>
+        <span class="meta-chip ${result.hasIptc ? 'chip-has' : 'chip-none'}">IPTC ${result.hasIptc ? '✓' : '✗'}</span>
+        <span class="meta-chip ${result.hasXmp ? 'chip-has' : 'chip-none'}">XMP ${result.hasXmp ? '✓' : '✗'}</span>
+        <span class="meta-chip ${result.hasProfile ? 'chip-has' : 'chip-none'}">ICC ${result.hasProfile ? '✓' : '✗'}</span>
+      </div>
+
+      <div class="meta-section-label">File Info</div>
+      <table class="meta-table">
+        ${fileRows.map(([k, v]) => `<tr><td>${escHtml(k)}</td><td>${escHtml(String(v))}</td></tr>`).join('')}
+      </table>
+
+      <div class="meta-section-label">EXIF Fields</div>
+      <table class="meta-table">${exifHtml}</table>
+    </div>
+  `;
+}
+
+// Export text report
+document.getElementById('viewer-export-report-btn').addEventListener('click', async () => {
+  if (!viewerResults.length) return;
+  let report = `IMPRINT V2.0 — METADATA ANALYSIS REPORT\nGenerated: ${new Date().toLocaleString()}\n${'─'.repeat(60)}\n\n`;
+  viewerResults.forEach((r, i) => {
+    report += `FILE ${i+1}: ${r.name}\n`;
+    if (r.error) { report += `  ERROR: ${r.error}\n\n`; return; }
+    report += `  Format: ${r.format?.toUpperCase()}  Dimensions: ${r.width}×${r.height}  Size: ${formatViewerSize(r.rawSize)}\n`;
+    report += `  EXIF: ${r.hasExif?'yes':'no'}  IPTC: ${r.hasIptc?'yes':'no'}  XMP: ${r.hasXmp?'yes':'no'}  ICC: ${r.hasProfile?'yes':'no'}\n`;
+    const exif = Object.entries(r.exif || {});
+    if (exif.length) {
+      report += `  EXIF Fields:\n`;
+      exif.forEach(([k, v]) => { report += `    ${k}: ${v}\n`; });
+    } else {
+      report += `  No EXIF fields found.\n`;
+    }
+    report += '\n';
+  });
+  // Use save dialog via zip mechanism — save as .txt
+  const blob = new Blob([report], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'imprint-metadata-report.txt';
+  a.click(); URL.revokeObjectURL(url);
+  toast('Report downloaded', 'success', 1500);
+});
+
+function formatViewerSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024*1024) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/1024/1024).toFixed(2)} MB`;
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+async function loadSettings() {
+  const settings = await window.api.getSettings();
+  const d = settings.defaults || {};
+  document.getElementById('setting-author').value      = d.author      || '';
+  document.getElementById('setting-copyright').value   = d.copyright   || '';
+  document.getElementById('setting-software').value    = d.software    || '';
+  document.getElementById('setting-keywords').value    = d.keywords    || '';
+  document.getElementById('setting-comment').value     = d.comment     || '';
+  document.getElementById('setting-description').value = d.description || '';
+  document.getElementById('setting-powered-by').checked = settings.poweredBy !== false;
+  document.getElementById('setting-folder-in-zip').checked = !!settings.folderInZip;
+  return settings;
+}
+
+document.getElementById('save-settings-btn').addEventListener('click', async () => {
+  const settings = {
+    poweredBy: document.getElementById('setting-powered-by').checked,
+    folderInZip: document.getElementById('setting-folder-in-zip').checked,
+    defaults: {
+      author:      document.getElementById('setting-author').value.trim(),
+      copyright:   document.getElementById('setting-copyright').value.trim(),
+      software:    document.getElementById('setting-software').value.trim(),
+      keywords:    document.getElementById('setting-keywords').value.trim(),
+      comment:     document.getElementById('setting-comment').value.trim(),
+      description: document.getElementById('setting-description').value.trim(),
+    }
+  };
+  await window.api.saveSettings(settings);
+  const note = document.getElementById('settings-saved-note');
+  note.style.display = 'inline';
+  setTimeout(() => note.style.display = 'none', 2500);
+  toast('Settings saved', 'success', 1500);
+});
+
+// Open external links via shell (Electron handles this)
+document.querySelectorAll('a[href^="http"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    // In Electron, use shell.openExternal — wire through IPC if needed
+    // For now, window.open works in Electron renderer
+    window.open(a.href, '_blank');
+  });
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

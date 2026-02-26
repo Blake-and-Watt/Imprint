@@ -1,0 +1,46 @@
+{
+  "name": "imprint",
+  "version": "2.0.0",
+  "description": "Bulk image metadata cleaner, EXIF writer, watermarker, and ZIP exporter",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-rebuild -f -w sharp",
+    "postinstall": "electron-rebuild -f -w sharp",
+    "build": "electron-builder"
+  },
+  "dependencies": {
+    "archiver": "^6.0.1",
+    "sharp": "^0.33.4"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9"
+  },
+  "build": {
+    "appId": "com.blakeandwatt.imprint",
+    "productName": "ImPrint",
+    "icon": "icon",
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "icon": "icon.icns",
+      "category": "public.app-category.photography"
+    },
+    "win": {
+      "icon": "icon.ico",
+      "target": "nsis"
+    },
+    "linux": {
+      "icon": "icon.png",
+      "target": "AppImage"
+    },
+    "extraResources": [
+      "icon.png",
+      "icon.ico",
+      "icon.icns"
+    ]
+  }
+}
