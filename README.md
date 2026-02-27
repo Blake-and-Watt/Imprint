@@ -13,7 +13,7 @@
 
 <br>
 
-![ImPrint Screenshot](assets/screenshot.png)
+![ImPrint Screenshot](assets/screenshot.jpg)
 
 </div>
 
