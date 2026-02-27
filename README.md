@@ -15,6 +15,25 @@
 
 ---
 
+## ⚠️ Legal Disclaimer & Acceptable Use
+
+**By downloading, installing, or using ImPrint in any form, you agree to the following:**
+
+ImPrint is a tool for legitimate image metadata management. It is provided solely for lawful personal, creative, and professional use — including copyright protection, creator attribution, portfolio preparation, and privacy management of your own files.
+
+**ImPrint must not be used for:**
+- Removing, falsifying, or circumventing metadata for the purpose of infringing copyright or claiming ownership of work that is not yours
+- Stripping provenance data to obscure the origin of AI-generated or synthetic media in contexts where disclosure is legally or contractually required
+- Evading digital watermarks, content credentials, or provenance systems embedded by third parties on content you do not own
+- Any activity that violates applicable law, including but not limited to copyright law, fraud statutes, or platform terms of service
+- Misrepresenting the source, authorship, or licensing status of any image
+
+**The authors and contributors of ImPrint accept no responsibility or liability for how this software is used.** By using ImPrint, you take full and sole responsibility for your actions, the files you process, and all consequences thereof. This includes any legal liability arising from misuse.
+
+This software is provided "as is," without warranty of any kind. The MIT License governs its distribution. Use it responsibly.
+
+---
+
 ## What Hole Does Imprint Fill?
 
 If you shoot, create, edit, or sell images — you've run into this problem:

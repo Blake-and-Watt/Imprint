@@ -1,9 +1,19 @@
 const { app, BrowserWindow, ipcMain, dialog, nativeTheme, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
 const sharp = require('sharp');
 const archiver = require('archiver');
 const { PassThrough } = require('stream');
+
+// ExifTool — load lazily so a missing install doesn't crash the app
+let exiftool = null;
+try { exiftool = require('exiftool-vendored').exiftool; } catch {}
+
+// exifr — pure-JS EXIF/IPTC/XMP parser, no binary needed, great fallback
+let exifr = null;
+try { exifr = require('exifr'); } catch {}
 
 nativeTheme.themeSource = 'dark';
 
@@ -70,6 +80,118 @@ function createWindow() {
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+app.on('before-quit', () => { try { if (exiftool) exiftool.end(); } catch {} });
+
+// ─── Format conversion helpers ────────────────────────────────────────────────
+async function convertFormat(buffer, fmt, quality) {
+  const q = Math.max(1, Math.min(100, quality || 100));
+  // Extract whatever metadata is currently in the buffer (user-written EXIF)
+  // and carry it through the format conversion — don't let the re-encode silently strip it.
+  try {
+    switch (fmt) {
+      case 'jpeg':
+        return await sharp(buffer).withMetadata().jpeg({ quality: q }).toBuffer();
+      case 'png':
+        return await sharp(buffer).withMetadata().png({ compressionLevel: Math.round((100 - q) / 56 * 9) }).toBuffer();
+      case 'webp':
+        return await sharp(buffer).withMetadata().webp({ quality: q }).toBuffer();
+      case 'tiff':
+        return await sharp(buffer).withMetadata().tiff({ quality: q }).toBuffer();
+      case 'gif':
+        return await sharp(buffer).withMetadata().gif().toBuffer();
+      case 'bmp':
+        return await sharpToBmp(buffer);   // raw pixel encoder — metadata not applicable
+      case 'pdf':
+        return await sharpToPdf(buffer, q); // JPEG-in-PDF wrapper
+      default:
+        return await sharp(buffer).withMetadata().jpeg({ quality: q }).toBuffer();
+    }
+  } catch (e) {
+    console.error('Format conversion error:', e);
+    return buffer;
+  }
+}
+
+// Minimal BMP encoder — 24-bit uncompressed DIB
+async function sharpToBmp(buffer) {
+  const { data, info } = await sharp(buffer).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const rowSize = Math.ceil(width * 3 / 4) * 4; // rows must be padded to 4-byte boundary
+  const pixelArraySize = rowSize * height;
+  const fileSize = 54 + pixelArraySize;
+  const bmp = Buffer.alloc(fileSize, 0);
+
+  // File header (14 bytes)
+  bmp.write('BM', 0, 'ascii');
+  bmp.writeUInt32LE(fileSize, 2);
+  bmp.writeUInt32LE(0, 6);       // reserved
+  bmp.writeUInt32LE(54, 10);     // pixel data offset
+
+  // DIB header (40 bytes)
+  bmp.writeUInt32LE(40, 14);     // BITMAPINFOHEADER size
+  bmp.writeInt32LE(width, 18);
+  bmp.writeInt32LE(-height, 22); // negative = top-down row order
+  bmp.writeUInt16LE(1, 26);      // color planes
+  bmp.writeUInt16LE(24, 28);     // bits per pixel
+  bmp.writeUInt32LE(0, 30);      // BI_RGB, no compression
+  bmp.writeUInt32LE(pixelArraySize, 34);
+  bmp.writeInt32LE(2835, 38);    // ~72 DPI X
+  bmp.writeInt32LE(2835, 42);    // ~72 DPI Y
+  bmp.writeUInt32LE(0, 46);
+  bmp.writeUInt32LE(0, 50);
+
+  // Write pixels: sharp gives RGB, BMP wants BGR
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const s = (y * width + x) * 3;
+      const d = 54 + y * rowSize + x * 3;
+      bmp[d]     = data[s + 2]; // B
+      bmp[d + 1] = data[s + 1]; // G
+      bmp[d + 2] = data[s];     // R
+    }
+  }
+  return bmp;
+}
+
+// PDF wrapper — embeds a JPEG inside a minimal valid single-page PDF
+async function sharpToPdf(buffer, quality) {
+  const jpegBuf = await sharp(buffer).jpeg({ quality: quality || 90 }).toBuffer();
+  const meta = await sharp(buffer).metadata();
+  const W = meta.width || 800;
+  const H = meta.height || 600;
+
+  // Build object strings
+  const obj = (n, body) => `${n} 0 obj\n${body}\nendobj\n`;
+  const catalog  = obj(1, `<</Type /Catalog /Pages 2 0 R>>`);
+  const pages    = obj(2, `<</Type /Pages /Kids [3 0 R] /Count 1>>`);
+  const content  = `q ${W} 0 0 ${H} 0 0 cm /Img Do Q`;
+  const page     = obj(3, `<</Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources <</XObject <</Img 5 0 R>>>> /Contents 4 0 R>>`);
+  const contObj  = obj(4, `<</Length ${content.length}>>\nstream\n${content}\nendstream`);
+  const imgHdr   = `5 0 obj\n<</Type /XObject /Subtype /Image /Width ${W} /Height ${H} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBuf.length}>>\nstream\n`;
+  const imgTail  = `\nendstream\nendobj\n`;
+
+  const header = '%PDF-1.4\n';
+  const body1 = catalog + pages + page + contObj;
+  const off5 = Buffer.byteLength(header) + Buffer.byteLength(body1);
+
+  const xrefPos = off5 + Buffer.byteLength(imgHdr) + jpegBuf.length + Buffer.byteLength(imgTail);
+
+  // Cross-reference table (approximate — good enough for most readers)
+  const xref = `xref\n0 6\n0000000000 65535 f \n` +
+    String(Buffer.byteLength(header)).padStart(10,'0') + ` 00000 n \n` +
+    String(Buffer.byteLength(header + catalog)).padStart(10,'0') + ` 00000 n \n` +
+    String(Buffer.byteLength(header + catalog + pages)).padStart(10,'0') + ` 00000 n \n` +
+    String(Buffer.byteLength(header + catalog + pages + page)).padStart(10,'0') + ` 00000 n \n` +
+    String(off5).padStart(10,'0') + ` 00000 n \n`;
+
+  const trailer = `trailer\n<</Size 6 /Root 1 0 R>>\nstartxref\n${xrefPos}\n%%EOF\n`;
+
+  return Buffer.concat([
+    Buffer.from(header + body1 + imgHdr),
+    jpegBuf,
+    Buffer.from(imgTail + xref + trailer)
+  ]);
+}
 
 // ─── IPC Handlers ────────────────────────────────────────────────────────────
 
@@ -144,10 +266,12 @@ ipcMain.handle('get-watermark-positions', (_, id) => {
   return (config.watermarkPositions || {})[id] || {};
 });
 
-ipcMain.handle('process-images', async (_, { images, metadata, watermarkId, opacity, folderInZip, zipFolderName, strip }) => {
+ipcMain.handle('process-images', async (_, { images, watermarkId, opacity, folderInZip, zipFolderName, strip, outputFormat, quality }) => {
   const config = loadConfig();
   const settings = config.settings || {};
   const defaults = settings.defaults || {};
+  const fmt = outputFormat || settings.outputFormat || 'jpeg';
+  const qual = quality ?? settings.quality ?? 100;
   let wmBuffer = null;
   let wmPositions = {};
 
@@ -212,23 +336,50 @@ ipcMain.handle('process-images', async (_, { images, metadata, watermarkId, opac
       v && (typeof v === 'string' ? v.trim().length > 0 : Array.isArray(v) ? v.length > 0 : false)
     );
 
-    // ── Step 1: Strip original metadata OR preserve it ─────────────────────────
-    let pipeline = strip
-      ? sharp(inputBuffer).withMetadata(false)
-      : sharp(inputBuffer).withMetadata();
+    // ── Step 1: Strip ALL metadata or preserve ────────────────────────────────
+    // strip=true  → decompose to raw RGB pixels and re-encode from scratch.
+    //               This is the ONLY way to guarantee removal of:
+    //               - EXIF / IPTC / XMP (standard metadata)
+    //               - JFIF / APP0 markers (resolution, version)
+    //               - C2PA / JUMBF (APP11 — provenance, SynthID, Google watermarks)
+    //               - ICC color profiles
+    //               - Maker notes, thumbnail strips, every APP-level segment
+    //               Sharp's .withMetadata(false) alone does NOT remove C2PA or JFIF.
+    // strip=false → keep all original metadata, user fields are overlaid on top.
 
-    // ── Step 2: Write user metadata on top ─────────────────────────────────────
-    if (hasUserMetadata) {
-      try {
-        pipeline = pipeline.withMetadata({ exif: buildExif(imgMeta) });
-      } catch (e) {
-        console.error('Metadata write error:', e);
+    let outputBuffer;
+
+    if (strip) {
+      // Decompose to raw pixels — absolutely nothing survives this
+      const { data: rawPixels, info: rawInfo } = await sharp(inputBuffer)
+        .ensureAlpha()   // normalise to RGBA so channels is always known
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+
+      // Re-encode from raw with only user metadata written — zero existing markers
+      let cleanPipeline = sharp(rawPixels, {
+        raw: { width: rawInfo.width, height: rawInfo.height, channels: rawInfo.channels }
+      }).withMetadata(false);
+
+      if (hasUserMetadata) {
+        try { cleanPipeline = cleanPipeline.withMetadata({ exif: buildExif(imgMeta) }); }
+        catch (e) { console.error('Metadata write error:', e); }
       }
+
+      outputBuffer = await cleanPipeline.toBuffer();
+    } else {
+      // Preserve original metadata, overlay user fields
+      let pipeline = sharp(inputBuffer).withMetadata();
+      if (hasUserMetadata) {
+        try { pipeline = pipeline.withMetadata({ exif: buildExif(imgMeta) }); }
+        catch (e) { console.error('Metadata write error:', e); }
+      }
+      outputBuffer = await pipeline.toBuffer();
     }
 
-    let outputBuffer = await pipeline.toBuffer();
-
-    // ── Step 3: Composite watermark — preserve metadata with .withMetadata() ───
+    // ── Step 3: Composite watermark ───────────────────────────────────────────
+    // .withMetadata() on the composite call carries whatever metadata was written
+    // in Step 1 through to the output — critical whether strip is on or off.
     if (wmBuffer) {
       try {
         const { width, height } = await sharp(outputBuffer).metadata();
@@ -247,7 +398,7 @@ ipcMain.handle('process-images', async (_, { images, metadata, watermarkId, opac
             .toBuffer();
 
           outputBuffer = await sharp(outputBuffer)
-            .withMetadata()
+            .withMetadata()   // preserve whatever metadata survived/was written above
             .composite([{ input: resizedWm, left: wmX, top: wmY, blend: 'over' }])
             .toBuffer();
         }
@@ -255,6 +406,9 @@ ipcMain.handle('process-images', async (_, { images, metadata, watermarkId, opac
         console.error('Watermark error:', e);
       }
     }
+
+    // ── Step 4: Convert format + apply quality ────────────────────────────────
+    outputBuffer = await convertFormat(outputBuffer, fmt, qual);
 
     // img.name is now the desired output filename (already set by renderer)
     processedFiles.push({ name: img.name, buffer: outputBuffer });
@@ -294,37 +448,66 @@ ipcMain.handle('save-settings', (_, settings) => {
 
 ipcMain.handle('read-metadata', async (_, { images }) => {
   const results = [];
-  for (const img of images) {
+
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
     try {
       const buf = Buffer.from(img.data, 'base64');
-      const meta = await sharp(buf).metadata();
-      // Extract EXIF sub-fields if present
-      let exifParsed = null;
-      if (meta.exif) {
+
+      // ── Always-available data ──────────────────────────────────────────────
+      const sharpMeta = await sharp(buf).metadata();
+      const md5 = crypto.createHash('md5').update(buf).digest('hex');
+      const rawHeaderHex = buf.slice(0, 64).toString('hex').toUpperCase()
+        .match(/.{1,2}/g).join(' ');
+
+      // ── Full ExifTool read (if available) ──────────────────────────────────
+      let allTags = null;
+      if (exiftool) {
+        const ext  = path.extname(img.name) || '.jpg';
+        const tmp  = path.join(os.tmpdir(), `imprint_${Date.now()}_${i}${ext}`);
+        fs.writeFileSync(tmp, buf);
         try {
-          // Read raw exif buffer as key-value by scanning common tag offsets
-          // sharp exposes exif as a Buffer — parse what we can display
-          exifParsed = parseExifBuffer(meta.exif);
-        } catch {}
+          const rawTags = await exiftool.read(tmp);
+          allTags = flattenTags(rawTags, buf.length, img.name, md5, rawHeaderHex);
+        } catch (e) {
+          console.error('exiftool read error:', e);
+        } finally {
+          try { fs.unlinkSync(tmp); } catch {}
+        }
       }
+
+      // ── exifr fallback (pure-JS, no binary) ────────────────────────────────
+      if (!allTags && exifr) {
+        try {
+          const parsed = await exifr.parse(buf, {
+            tiff: true, xmp: true, iptc: true, jfif: true, ihdr: true,
+            icc: true, makerNote: false, userComment: true, translateValues: true,
+            reviveValues: true, sanitize: true, mergeOutput: false,
+          });
+          allTags = flattenExifrTags(parsed, buf.length, img.name, md5, rawHeaderHex);
+        } catch (e) {
+          console.error('exifr parse error:', e);
+        }
+      }
+
+      // ── Sharp-only last resort ─────────────────────────────────────────────
+      if (!allTags) {
+        allTags = fallbackSharpTags(sharpMeta, buf.length, img.name, md5, rawHeaderHex);
+      }
+
       results.push({
         name: img.name,
-        format: meta.format,
-        width: meta.width,
-        height: meta.height,
-        space: meta.space,
-        channels: meta.channels,
-        depth: meta.depth,
-        density: meta.density,
-        hasAlpha: meta.hasAlpha,
-        hasProfile: meta.hasProfile,
-        orientation: meta.orientation,
-        exif: exifParsed,
-        hasExif: !!meta.exif,
-        hasIcc: !!meta.icc,
-        hasIptc: !!meta.iptc,
-        hasXmp: !!meta.xmp,
-        rawSize: buf.length,
+        // Summary fields for the header card
+        format:     sharpMeta.format,
+        width:      sharpMeta.width,
+        height:     sharpMeta.height,
+        rawSize:    buf.length,
+        hasExif:    !!sharpMeta.exif,
+        hasIptc:    !!sharpMeta.iptc,
+        hasXmp:     !!sharpMeta.xmp,
+        hasProfile: !!sharpMeta.icc,
+        // All grouped tags for the table
+        groups: allTags,
       });
     } catch (e) {
       results.push({ name: img.name, error: e.message });
@@ -333,76 +516,182 @@ ipcMain.handle('read-metadata', async (_, { images }) => {
   return results;
 });
 
-// Minimal EXIF buffer parser — reads ASCII/SHORT/LONG tags from IFD0
-function parseExifBuffer(buf) {
-  const fields = {};
-  try {
-    if (!buf || buf.length < 8) return fields;
-    // Check byte order: 'II' = little endian, 'MM' = big endian
-    const marker = buf.slice(0, 2).toString('ascii');
-    const le = marker === 'II';
-    const read16 = (o) => le ? buf.readUInt16LE(o) : buf.readUInt16BE(o);
-    const read32 = (o) => le ? buf.readUInt32LE(o) : buf.readUInt32BE(o);
-    const ifdOffset = read32(4);
+// Tag group inference from tag name
+function inferGroup(key) {
+  const k = key.toLowerCase();
+  if (['filename','filesize','filetype','filetypeextension','mimetype','checksum',
+       'sourcefile','rawheader','rawheaderhex','filemodifydate','fileaccessdate',
+       'filecreatetime','filesize_bytes'].includes(k)) return 'File Info';
+  if (k.startsWith('jfif')) return 'JFIF';
+  if (['imagewidth','imageheight','imagesize','megapixels','colorspace',
+       'colorcomponents','bitspersample','encodingprocess','ycbcrsubsampling',
+       'pixelsperunitx','pixelsperunity','pixelunits','photometricinterpretation',
+       'samplesperpixel','rowsperstrip','stripoffsets','stripbytecounts',
+       'orientation','xresolution','yresolution','resolutionunit'].includes(k)) return 'Image';
+  if (k.startsWith('gps')) return 'GPS';
+  if (['make','model','lensmodel','lensinfo','lensid','lensspec','cameraid'].includes(k)) return 'Camera';
+  if (['exposuretime','fnumber','iso','isospeedratings','exposureprogram','meteringmode',
+       'flash','focallength','shutterspeedvalue','aperturevalue','brightnessvalue',
+       'exposurecompensation','whitebalance','digitalzoomratio','scenecapturetype',
+       'focallengthin35mmformat','lightsource','contrast','saturation','sharpness',
+       'gaincontrol','subjectdistance','maxaperturevalue','exposuremode'].includes(k)) return 'Camera Settings';
+  if (k.includes('date') || k.includes('time') || k === 'createdate' || k === 'modifydate') return 'Dates & Time';
+  if (['artist','copyright','creator','rights','title','description','keywords',
+       'caption','subject','headline','imagedescription','usercomment','comment',
+       'xptitle','xpcomment','xpauthor','xpkeywords','xpsubject',
+       'captionabstract','creditline','source','writer','byline','category','objectname'].includes(k)) return 'Creator & Description';
+  if (k.startsWith('c2pa') || k.startsWith('claim') || k.startsWith('actions') ||
+      k.startsWith('item') || k.startsWith('jumd') || k.startsWith('jumb') ||
+      k.includes('c2pa') || k.includes('synthi') || k.includes('digitalsource') ||
+      ['instanceid','signatureuri','alg','signature','exclusions','hashdata',
+       'pad','generatorname','generatorversion'].includes(k)) return 'C2PA / Provenance';
+  if (k.startsWith('xmp') || k.startsWith('xap') || k === 'rating') return 'XMP';
+  if (k.startsWith('iptc') || ['city','province','state','country','countrycode',
+       'urgency','copyrightnotice','instructions'].includes(k)) return 'IPTC';
+  if (k.startsWith('icc') || k.includes('profilename') || k.includes('colorspace') ||
+      ['colorprofile','profiledescription','profilecopyright','profileclass',
+       'profileconnectionspace','renderingintent'].includes(k)) return 'ICC Profile';
+  if (k.startsWith('exif')) return 'EXIF';
+  return 'EXIF / Other';
+}
 
-    // Known tag IDs → friendly names
-    const tagNames = {
-      0x010E: 'ImageDescription', 0x010F: 'Make', 0x0110: 'Model',
-      0x0112: 'Orientation', 0x011A: 'XResolution', 0x011B: 'YResolution',
-      0x0128: 'ResolutionUnit', 0x0131: 'Software', 0x0132: 'DateTime',
-      0x013B: 'Artist', 0x013E: 'WhitePoint', 0x8298: 'Copyright',
-      0x8769: 'ExifIFD', 0x9003: 'DateTimeOriginal', 0x9004: 'DateTimeDigitized',
-      0x9286: 'UserComment', 0x920A: 'FocalLength', 0x829A: 'ExposureTime',
-      0x829D: 'FNumber', 0x8827: 'ISOSpeedRatings', 0xA420: 'ImageUniqueID',
-      0x013C: 'HostComputer', 0x9C9B: 'XPTitle', 0x9C9C: 'XPComment',
-      0x9C9D: 'XPAuthor', 0x9C9E: 'XPKeywords', 0x9C9F: 'XPSubject',
-    };
-
-    const entryCount = read16(ifdOffset);
-    for (let i = 0; i < entryCount && i < 64; i++) {
-      const base = ifdOffset + 2 + i * 12;
-      if (base + 12 > buf.length) break;
-      const tag = read16(base);
-      const type = read16(base + 2);
-      const count = read32(base + 4);
-      const valOffset = base + 8;
-
-      const name = tagNames[tag];
-      if (!name) continue;
-
-      try {
-        let value = null;
-        if (type === 2) { // ASCII
-          const dataLen = count;
-          let dataStart = valOffset;
-          if (dataLen > 4) dataStart = read32(valOffset);
-          if (dataStart + dataLen <= buf.length) {
-            value = buf.slice(dataStart, dataStart + dataLen).toString('ascii').replace(/\0/g, '').trim();
-          }
-        } else if (type === 3 && count === 1) { // SHORT
-          value = read16(valOffset);
-        } else if (type === 4 && count === 1) { // LONG
-          value = read32(valOffset);
-        } else if (type === 5 && count >= 1) { // RATIONAL
-          const rOff = read32(valOffset);
-          if (rOff + 8 <= buf.length) {
-            const num = read32(rOff);
-            const den = read32(rOff + 4);
-            value = den !== 0 ? `${num}/${den}` : `${num}`;
-          }
-        } else if (type === 7 && name === 'UserComment' && count > 8) { // UNDEFINED
-          const ucOff = count > 4 ? read32(valOffset) : valOffset;
-          if (ucOff + count <= buf.length) {
-            value = buf.slice(ucOff + 8, ucOff + count).toString('utf8').replace(/\0/g, '').trim();
-          }
-        }
-        if (value !== null && value !== undefined && value !== '') {
-          fields[name] = String(value);
-        }
-      } catch {}
+// Convert an ExifTool tag value to a display string
+function tagValueToString(val) {
+  if (val === null || val === undefined) return null;
+  if (Buffer.isBuffer(val)) return val.length > 0 ? `(Binary data ${val.length} bytes)` : '(Empty)';
+  if (typeof val === 'object') {
+    const cn = val.constructor?.name;
+    // ExifDateTime / ExifDate / ExifTime
+    if (cn === 'ExifDateTime' || cn === 'ExifDate' || cn === 'ExifTime') {
+      try { return val.toISOString?.() ?? val.toString(); } catch { return String(val); }
     }
-  } catch {}
-  return fields;
+    // BinaryField (exiftool-vendored wraps binary as {_bin: base64})
+    if (val._bin !== undefined) {
+      const bytes = Buffer.from(val._bin, 'base64').length;
+      return `(Binary data ${bytes} bytes)`;
+    }
+    if (Array.isArray(val)) {
+      const strs = val.map(tagValueToString).filter(v => v !== null);
+      return strs.join(', ');
+    }
+    try { const s = String(val); return s === '[object Object]' ? JSON.stringify(val) : s; } catch { return '(Object)'; }
+  }
+  return String(val);
+}
+
+function flattenTags(rawTags, fileSize, fileName, md5, rawHeaderHex) {
+  // Internal ExifTool props to skip
+  const skip = new Set(['SourceFile','ExifToolVersion','errors','warnings']);
+  // Group → [{key, value}]
+  const groups = {};
+  const addTag = (key, val) => {
+    const displayVal = tagValueToString(val);
+    if (!displayVal || displayVal === 'undefined') return;
+    const group = inferGroup(key);
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({ key, value: displayVal });
+  };
+
+  // Inject our own computed fields first
+  addTag('FileName',    fileName);
+  addTag('FileSize',    formatBytes(fileSize));
+  addTag('Checksum',    md5);
+  addTag('RawHeaderHex', rawHeaderHex);
+
+  // Process ExifTool tags
+  for (const [key, val] of Object.entries(rawTags)) {
+    if (skip.has(key) || typeof val === 'function' || typeof key === 'symbol') continue;
+    if (key === 'FileName' || key === 'FileSize') continue; // already added
+    addTag(key, val);
+  }
+
+  // Sort within each group alphabetically
+  for (const g of Object.values(groups)) g.sort((a, b) => a.key.localeCompare(b.key));
+  return groups;
+}
+
+// Build groups from exifr output (multi-segment object keyed by segment name)
+function flattenExifrTags(parsed, fileSize, fileName, md5, rawHeaderHex) {
+  const groups = {};
+  const addTag = (group, key, val) => {
+    const s = tagValueToString(val);
+    if (!s || s === 'undefined') return;
+    if (!groups[group]) groups[group] = [];
+    // Avoid duplicate keys in same group
+    if (!groups[group].find(r => r.key === key)) groups[group].push({ key, value: s });
+  };
+
+  // Always-present computed fields
+  addTag('File Info', 'FileName',    fileName);
+  addTag('File Info', 'FileSize',    formatBytes(fileSize));
+  addTag('File Info', 'Checksum',    md5);
+  addTag('File Info', 'RawHeaderHex', rawHeaderHex);
+
+  if (!parsed) return groups;
+
+  // exifr returns segments: { exif, gps, ifd0, iptc, xmp, jfif, icc, ... }
+  const segmentGroupMap = {
+    ifd0:    'Image',
+    ifd1:    'Image',
+    exif:    'EXIF / Camera',
+    gps:     'GPS',
+    iptc:    'IPTC',
+    xmp:     'XMP',
+    jfif:    'JFIF',
+    jfxx:    'JFIF',
+    icc:     'ICC Profile',
+  };
+
+  for (const [seg, segData] of Object.entries(parsed)) {
+    if (!segData || typeof segData !== 'object') continue;
+    const group = segmentGroupMap[seg.toLowerCase()] || inferGroup(seg);
+    if (Buffer.isBuffer(segData)) {
+      addTag(group, seg, segData);
+      continue;
+    }
+    for (const [key, val] of Object.entries(segData)) {
+      if (typeof val === 'function') continue;
+      addTag(group, key, val);
+    }
+  }
+
+  // Sort within each group
+  for (const g of Object.values(groups)) g.sort((a, b) => a.key.localeCompare(b.key));
+  return groups;
+}
+
+function fallbackSharpTags(meta, fileSize, fileName, md5, rawHeaderHex) {
+  const groups = {};
+  const addTag = (group, key, val) => {
+    if (val === null || val === undefined) return;
+    if (!groups[group]) groups[group] = [];
+    groups[group].push({ key, value: String(val) });
+  };
+  addTag('File Info', 'FileName',     fileName);
+  addTag('File Info', 'FileSize',     formatBytes(fileSize));
+  addTag('File Info', 'Checksum',     md5);
+  addTag('File Info', 'RawHeaderHex', rawHeaderHex);
+  addTag('Image', 'Format',       meta.format?.toUpperCase());
+  addTag('Image', 'Width',        meta.width);
+  addTag('Image', 'Height',       meta.height);
+  addTag('Image', 'Channels',     meta.channels);
+  addTag('Image', 'BitDepth',     meta.depth);
+  addTag('Image', 'ColorSpace',   meta.space);
+  addTag('Image', 'Density',      meta.density ? `${meta.density} dpi` : null);
+  addTag('Image', 'HasAlpha',     meta.hasAlpha ? 'Yes' : 'No');
+  addTag('Image', 'Orientation',  meta.orientation);
+  addTag('ICC Profile', 'EmbeddedProfile', meta.icc ? 'Yes' : 'No');
+  if (meta.exif)  addTag('EXIF', 'EXIFPresent', 'Yes (install exiftool-vendored to decode)');
+  if (meta.iptc)  addTag('IPTC', 'IPTCPresent', 'Yes (install exiftool-vendored to decode)');
+  if (meta.xmp)   addTag('XMP',  'XMPPresent',  'Yes (install exiftool-vendored to decode)');
+  return groups;
+}
+
+function formatBytes(b) {
+  if (!b) return '0 B';
+  if (b < 1024) return `${b} B`;
+  if (b < 1024*1024) return `${(b/1024).toFixed(1)} KB`;
+  return `${(b/1024/1024).toFixed(2)} MB`;
 }
 
 ipcMain.handle('get-saved-values', () => {
