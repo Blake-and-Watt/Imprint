@@ -332,6 +332,11 @@ ipcMain.handle('process-images', async (_, { images, watermarkId, opacity, folde
       imgMeta.custom.push({ key: 'powered_by', value: 'Imprint · https://github.com/Blake-and-Watt/Imprint' });
     }
 
+    // Detect input format for "original" mode
+    const inputMeta = await sharp(inputBuffer).metadata();
+    const inputFmt  = inputMeta.format || 'jpeg'; // jpeg, png, webp, tiff, gif, etc.
+    const actualFmt = (fmt === 'original' || !fmt) ? inputFmt : fmt;
+
     const hasUserMetadata = Object.values(imgMeta).some(v =>
       v && (typeof v === 'string' ? v.trim().length > 0 : Array.isArray(v) ? v.length > 0 : false)
     );
@@ -346,17 +351,23 @@ ipcMain.handle('process-images', async (_, { images, watermarkId, opacity, folde
     //               - Maker notes, thumbnail strips, every APP-level segment
     //               Sharp's .withMetadata(false) alone does NOT remove C2PA or JFIF.
     // strip=false → keep all original metadata, user fields are overlaid on top.
+    //
+    // IMPORTANT: when building from raw pixels, MUST call .png()/.jpeg() etc. before
+    // .toBuffer() — calling .toBuffer() on a raw-pixel sharp pipeline with no output
+    // format specified returns raw RGBA bytes, NOT a valid image file.
 
     let outputBuffer;
 
     if (strip) {
       // Decompose to raw pixels — absolutely nothing survives this
       const { data: rawPixels, info: rawInfo } = await sharp(inputBuffer)
-        .ensureAlpha()   // normalise to RGBA so channels is always known
+        .ensureAlpha()          // normalise to RGBA so channels is always 4
         .raw()
         .toBuffer({ resolveWithObject: true });
 
-      // Re-encode from raw with only user metadata written — zero existing markers
+      // Re-encode from raw. Output as lossless PNG here so the buffer is a valid
+      // image file that can pass through watermark compositing and convertFormat.
+      // convertFormat will handle the final target-format re-encode.
       let cleanPipeline = sharp(rawPixels, {
         raw: { width: rawInfo.width, height: rawInfo.height, channels: rawInfo.channels }
       }).withMetadata(false);
@@ -366,7 +377,8 @@ ipcMain.handle('process-images', async (_, { images, watermarkId, opacity, folde
         catch (e) { console.error('Metadata write error:', e); }
       }
 
-      outputBuffer = await cleanPipeline.toBuffer();
+      // Must specify .png() — without a format, sharp outputs raw bytes for raw input
+      outputBuffer = await cleanPipeline.png().toBuffer();
     } else {
       // Preserve original metadata, overlay user fields
       let pipeline = sharp(inputBuffer).withMetadata();
@@ -407,8 +419,8 @@ ipcMain.handle('process-images', async (_, { images, watermarkId, opacity, folde
       }
     }
 
-    // ── Step 4: Convert format + apply quality ────────────────────────────────
-    outputBuffer = await convertFormat(outputBuffer, fmt, qual);
+    // ── Step 4: Convert to target format + apply quality ─────────────────────
+    outputBuffer = await convertFormat(outputBuffer, actualFmt, qual);
 
     // img.name is now the desired output filename (already set by renderer)
     processedFiles.push({ name: img.name, buffer: outputBuffer });
@@ -734,4 +746,162 @@ ipcMain.handle('save-zip', async (_, { data, defaultName }) => {
   config.lastZipName = name;
   saveConfig(config);
   return name;
+});
+
+// ─── Delete Originals (experimental) ─────────────────────────────────────────
+
+ipcMain.handle('confirm-delete-originals', async (_, message) => {
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    title: 'Move Originals to Trash?',
+    message: 'Move original files to Trash?',
+    detail: message,
+    buttons: ['Move to Trash', 'Cancel'],
+    defaultId: 1,        // Cancel is the safe default
+    cancelId: 1,
+    icon: getIconPath(),
+  });
+  return result.response === 0; // true = user clicked "Move to Trash"
+});
+
+ipcMain.handle('delete-originals', async (_, paths) => {
+  const results = [];
+  for (const filePath of paths) {
+    try {
+      if (!filePath || !fs.existsSync(filePath)) {
+        results.push({ path: filePath, ok: false, error: 'File not found' });
+        continue;
+      }
+      await shell.trashItem(filePath); // moves to OS Trash — recoverable
+      results.push({ path: filePath, ok: true });
+    } catch (e) {
+      results.push({ path: filePath, ok: false, error: e.message });
+    }
+  }
+  return results;
+});
+
+// ─── Save single file (Quick Save) ───────────────────────────────────────────
+// The renderer passes the ZIP from processImages + the desired filename.
+// We extract the single file from the ZIP in-memory and offer a save dialog.
+ipcMain.handle('save-file', async (_, { zipData, defaultName }) => {
+  // Extract first file from in-memory ZIP
+  const zipBuf = Buffer.from(zipData, 'base64');
+  let fileBuffer;
+  try {
+    // Use archiver for writing, but for reading we need a sync unzip approach.
+    // Node has no built-in ZIP reader — use the buffer directly via a temp extraction.
+    const tmp = path.join(os.tmpdir(), `imprint_single_${Date.now()}.zip`);
+    fs.writeFileSync(tmp, zipBuf);
+
+    // Use child_process to unzip into a temp dir
+    const tmpDir = path.join(os.tmpdir(), `imprint_out_${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const { execFileSync } = require('child_process');
+
+    try {
+      // macOS/Linux: unzip; Windows: Expand-Archive via PowerShell
+      if (process.platform === 'win32') {
+        execFileSync('powershell', [
+          '-NoProfile', '-Command',
+          `Expand-Archive -LiteralPath '${tmp}' -DestinationPath '${tmpDir}' -Force`
+        ]);
+      } else {
+        execFileSync('unzip', ['-q', '-o', tmp, '-d', tmpDir]);
+      }
+
+      // Find the extracted file (could be at root or in a subfolder)
+      const findFile = (dir) => {
+        for (const entry of fs.readdirSync(dir)) {
+          const full = path.join(dir, entry);
+          if (fs.statSync(full).isDirectory()) { const r = findFile(full); if (r) return r; }
+          else return full;
+        }
+        return null;
+      };
+      const found = findFile(tmpDir);
+      if (found) fileBuffer = fs.readFileSync(found);
+    } finally {
+      try { fs.unlinkSync(tmp); } catch {}
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
+  } catch (e) {
+    console.error('save-file extraction error:', e);
+    // Fallback: if extraction fails, just offer the ZIP
+    defaultName = defaultName.replace(/\.[^.]+$/, '') + '.zip';
+    fileBuffer = zipBuf;
+  }
+
+  if (!fileBuffer) return null;
+
+  // Derive extension from defaultName for the filter
+  const ext = path.extname(defaultName).slice(1) || 'jpg';
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save Processed Image',
+    defaultPath: defaultName,
+    filters: [
+      { name: ext.toUpperCase(), extensions: [ext] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+
+  if (result.canceled || !result.filePath) return null;
+  fs.writeFileSync(result.filePath, fileBuffer);
+  return path.basename(result.filePath);
+});
+
+// ─── Save all files to folder (Bulk Save) ────────────────────────────────────
+ipcMain.handle('save-files-to-folder', async (_, { zipData, files }) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose Folder to Save Files',
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Save Here',
+  });
+
+  if (result.canceled || !result.filePaths.length) return null;
+  const destDir = result.filePaths[0];
+
+  const zipBuf = Buffer.from(zipData, 'base64');
+  const tmp    = path.join(os.tmpdir(), `imprint_bulk_${Date.now()}.zip`);
+  const tmpDir = path.join(os.tmpdir(), `imprint_bulk_out_${Date.now()}`);
+  let saved = 0;
+
+  try {
+    fs.writeFileSync(tmp, zipBuf);
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    const { execFileSync } = require('child_process');
+    if (process.platform === 'win32') {
+      execFileSync('powershell', [
+        '-NoProfile', '-Command',
+        `Expand-Archive -LiteralPath '${tmp}' -DestinationPath '${tmpDir}' -Force`
+      ]);
+    } else {
+      execFileSync('unzip', ['-q', '-o', tmp, '-d', tmpDir]);
+    }
+
+    // Collect all extracted files
+    const collected = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir)) {
+        const full = path.join(dir, entry);
+        if (fs.statSync(full).isDirectory()) walk(full);
+        else collected.push({ full, base: entry });
+      }
+    };
+    walk(tmpDir);
+
+    for (const { full, base } of collected) {
+      const dest = path.join(destDir, base);
+      fs.copyFileSync(full, dest);
+      saved++;
+    }
+  } catch (e) {
+    console.error('save-files-to-folder error:', e);
+  } finally {
+    try { fs.unlinkSync(tmp); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  }
+
+  return { saved, folder: destDir };
 });

@@ -17,4 +17,8 @@ contextBridge.exposeInMainWorld('api', {
   getSavedValues: () => ipcRenderer.invoke('get-saved-values'),
   saveFieldValue: (fieldKey, value) => ipcRenderer.invoke('save-field-value', { fieldKey, value }),
   deleteSavedValue: (fieldKey, value) => ipcRenderer.invoke('delete-saved-value', { fieldKey, value }),
+  confirmDeleteOriginals: (message) => ipcRenderer.invoke('confirm-delete-originals', message),
+  deleteOriginals: (paths) => ipcRenderer.invoke('delete-originals', paths),
+  saveFile: (payload) => ipcRenderer.invoke('save-file', payload),
+  saveFilesToFolder: (payload) => ipcRenderer.invoke('save-files-to-folder', payload),
 });

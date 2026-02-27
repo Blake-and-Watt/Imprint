@@ -11,16 +11,17 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* ── Dark theme (default) ── */
   :root {
     --bg: #080808;
     --bg1: #0f0f0f;
     --bg2: #161616;
     --bg3: #1e1e1e;
     --border: #2a2a2a;
-    --border2: #333;
-    --text: #e8e8e8;
-    --text2: #888;
-    --text3: #555;
+    --border2: #383838;
+    --text: #f0f0f0;
+    --text2: #aaaaaa;
+    --text3: #666666;
     --accent: #e8ff47;
     --accent2: #b8cc30;
     --red: #ff4444;
@@ -28,7 +29,37 @@
     --blue: #4499ff;
     --mono: 'DM Mono', 'Courier New', 'Consolas', 'Menlo', monospace;
     --sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --shadow: rgba(0,0,0,0.5);
   }
+
+  /* ── Light theme ── */
+  html.light {
+    --bg: #f5f5f3;
+    --bg1: #ebebea;
+    --bg2: #e0e0de;
+    --bg3: #d4d4d2;
+    --border: #ccccca;
+    --border2: #bbbbba;
+    --text: #111111;
+    --text2: #444444;
+    --text3: #888888;
+    --accent: #8a9e00;
+    --accent2: #6b7a00;
+    --red: #cc2222;
+    --green: #1a8a44;
+    --blue: #1a66cc;
+    --shadow: rgba(0,0,0,0.15);
+  }
+
+  /* Theme toggle button */
+  .theme-toggle {
+    width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border);
+    background: transparent; color: var(--text3); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .theme-toggle:hover { border-color: var(--accent); color: var(--accent); background: rgba(128,128,0,0.08); }
+  .theme-toggle svg { width: 14px; height: 14px; }
 
   html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; }
 
@@ -222,6 +253,10 @@
     letter-spacing: 0.05em; cursor: pointer; transition: all 0.15s; white-space: nowrap;
   }
   .apply-all-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.06); }
+  .apply-all-btn.apply-all-on { border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,0.08); }
+
+  /* Shared field dimming when switched to per-image */
+  .field-scope-per { opacity: 0.4; pointer-events: none; }
 
   /* ── Section badge / shared label ── */
   .section-badge {
@@ -501,7 +536,73 @@
   .toast.success { border-left: 3px solid var(--green); }
   .toast.error { border-left: 3px solid var(--red); }
   .toast.info { border-left: 3px solid var(--blue); }
-  /* ── Metadata Viewer Panel ── */
+  /* ── Scope toggle (All Files ↔ Per Image) ── */
+  .scope-toggle {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 7px; border-radius: 10px; border: 1px solid;
+    font-family: var(--mono); font-size: 8px; letter-spacing: 0.08em;
+    cursor: pointer; transition: all 0.15s; margin-left: 7px;
+    vertical-align: middle; font-weight: 600; line-height: 1; background: transparent;
+  }
+  .scope-toggle.scope-all {
+    color: var(--blue); border-color: rgba(68,153,255,0.35);
+    background: rgba(68,153,255,0.08);
+  }
+  .scope-toggle.scope-all:hover { background: rgba(68,153,255,0.15); }
+  .scope-toggle.scope-per {
+    color: var(--accent); border-color: rgba(232,255,71,0.35);
+    background: rgba(232,255,71,0.07);
+  }
+  .scope-toggle.scope-per:hover { background: rgba(232,255,71,0.14); }
+
+  .field-scope-per .ac-wrap input,
+  .field-scope-per .ac-wrap-textarea textarea {
+    opacity: 0.3; pointer-events: none; cursor: not-allowed;
+  }
+  .scope-hint {
+    display: none; font-family: var(--mono); font-size: 9px;
+    color: var(--accent); letter-spacing: 0.04em; margin-top: 4px;
+    opacity: 0.8;
+  }
+  .field-scope-per .scope-hint { display: block; }
+
+  /* ── Viewer search ── */
+  .viewer-search-bar {
+    padding: 10px 16px 8px; border-bottom: 1px solid var(--border);
+    background: var(--bg1);
+  }
+  .viewer-search-input {
+    width: 100%; background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 5px; color: var(--text); font-family: var(--sans); font-size: 12px;
+    padding: 6px 10px 6px 28px; outline: none; transition: border-color 0.15s;
+  }
+  .viewer-search-input:focus { border-color: var(--accent); }
+  .viewer-search-wrap { position: relative; }
+  .viewer-search-icon {
+    position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+    color: var(--text3); pointer-events: none;
+  }
+
+  /* ── Metadata group headers ── */
+  .meta-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 8px; background: var(--bg3); border-radius: 5px;
+    margin: 12px 0 4px; cursor: pointer; user-select: none;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+    color: var(--text2); text-transform: uppercase; border: 1px solid var(--border);
+  }
+  .meta-group-header:hover { border-color: var(--border2); color: var(--text); }
+  .meta-group-header .group-count {
+    color: var(--text3); font-size: 9px;
+  }
+  .meta-group-header .group-chevron { transition: transform 0.15s; }
+  .meta-group-header.collapsed .group-chevron { transform: rotate(-90deg); }
+  .meta-group-body { overflow: hidden; }
+  .meta-group-body.collapsed { display: none; }
+
+  .meta-table tr.hidden { display: none; }
+  .meta-val-binary { color: var(--text3); font-style: italic; font-size: 11px; }
+  .meta-val-long { word-break: break-all; font-family: var(--mono); font-size: 10px; color: var(--text2); }
   .viewer-panel { flex-direction: row; }
   .viewer-drop-side {
     width: 280px; min-width: 240px; border-right: 1px solid var(--border);
@@ -630,6 +731,9 @@
   }
   .toggle-switch input:checked + label { background: var(--accent); border-color: var(--accent2); }
   .toggle-switch input:checked + label::after { left: 19px; background: #000; }
+  /* Danger toggle — red when on */
+  .toggle-switch input#setting-delete-original:checked + label { background: var(--red); border-color: var(--red); }
+  .toggle-switch input#setting-delete-original:checked + label::after { background: #fff; }
 
   .settings-save-bar {
     padding: 16px 28px; border-top: 1px solid var(--border); background: var(--bg1);
@@ -726,14 +830,24 @@
       </div>
     </nav>
     <div class="sidebar-footer">
-      <a href="https://ko-fi.com/BlakeAndWatt" id="kofi-link"
-        style="display:flex;align-items:center;gap:6px;text-decoration:none;padding:6px 0;border-radius:4px;transition:opacity 0.15s;opacity:0.7;"
-        title="Support Imprint on Ko-fi">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="#ff5f5f">
-          <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
-        </svg>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text3);">Support on Ko-fi</span>
-      </a>
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+        <a href="https://ko-fi.com/BlakeAndWatt" id="kofi-link"
+          style="display:flex;align-items:center;gap:6px;text-decoration:none;padding:4px 0;opacity:0.7;"
+          title="Support Imprint on Ko-fi">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#ff5f5f">
+            <path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/>
+          </svg>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text3);">Ko-fi</span>
+        </a>
+        <button class="theme-toggle" id="theme-toggle-btn" title="Toggle light/dark mode">
+          <svg id="theme-icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg id="theme-icon-light" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </aside>
 
@@ -877,7 +991,9 @@
               </div>
 
               <div class="field">
-                <label>KEYWORDS</label>
+                <label>KEYWORDS
+                  <button class="scope-toggle scope-all" id="scope-keywords" data-field="keywords">⊕ ALL FILES</button>
+                </label>
                 <div class="ac-wrap">
                   <input type="text" id="meta-keywords" placeholder="tag1, tag2">
                   <button class="save-val-btn" data-field="keywords" title="Save this value">
@@ -885,10 +1001,13 @@
                   </button>
                   <div class="ac-dropdown" id="ac-keywords"></div>
                 </div>
+                <span class="scope-hint">↓ Edit per-image in the selected image card</span>
               </div>
 
-              <div class="field field-full">
-                <label>COMMENT</label>
+              <div class="field field-full" id="field-wrap-comment">
+                <label>COMMENT
+                  <button class="scope-toggle scope-all" id="scope-comment" data-field="comment">⊕ ALL FILES</button>
+                </label>
                 <div class="ac-wrap">
                   <input type="text" id="meta-comment" placeholder="Internal comment">
                   <button class="save-val-btn" data-field="comment" title="Save this value">
@@ -896,14 +1015,18 @@
                   </button>
                   <div class="ac-dropdown" id="ac-comment"></div>
                 </div>
+                <span class="scope-hint">↓ Edit per-image in the selected image card</span>
               </div>
 
-              <div class="field field-full">
-                <label>DESCRIPTION</label>
+              <div class="field field-full" id="field-wrap-description">
+                <label>DESCRIPTION
+                  <button class="scope-toggle scope-all" id="scope-description" data-field="description">⊕ ALL FILES</button>
+                </label>
                 <div class="ac-wrap-textarea">
                   <textarea id="meta-description" placeholder="Image description..."></textarea>
                   <div class="ac-dropdown" id="ac-description"></div>
                 </div>
+                <span class="scope-hint">↓ Edit per-image in the selected image card</span>
               </div>
 
             </div>
@@ -911,12 +1034,17 @@
 
           <!-- Custom fields -->
           <div class="section">
-            <div class="section-title">Custom Fields <span class="section-badge">ALL FILES</span></div>
-            <div class="custom-fields" id="custom-fields"></div>
-            <button class="btn btn-ghost btn-sm" style="margin-top:8px" id="add-custom-field">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 1v8M1 5h8"/></svg>
-              Add field
-            </button>
+            <div class="section-title">Custom Fields <span class="section-badge">ALL FILES</span>
+              <button class="scope-toggle scope-all" id="scope-custom" data-field="custom" style="margin-left:6px;">⊕ ALL FILES</button>
+            </div>
+            <span class="scope-hint" id="custom-scope-hint" style="display:none;margin-bottom:8px;">↓ Edit per-image in the selected image card</span>
+            <div id="shared-custom-fields-wrap">
+              <div class="custom-fields" id="custom-fields"></div>
+              <button class="btn btn-ghost btn-sm" style="margin-top:8px" id="add-custom-field">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 1v8M1 5h8"/></svg>
+                Add field
+              </button>
+            </div>
           </div>
 
           <!-- Watermark -->
@@ -948,6 +1076,10 @@
             <label>ZIP NAME</label>
             <input type="text" class="zip-name-input" id="zip-name" placeholder="processed-images">
             <span class="zip-ext">.zip</span>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;flex-shrink:0;margin-left:4px;" title="Append date/time to ZIP name and folder name">
+              <input type="checkbox" id="zip-timestamp" style="accent-color:var(--accent)">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.05em;white-space:nowrap;">+ TIMESTAMP</span>
+            </label>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-primary" id="export-btn" disabled>
@@ -955,6 +1087,21 @@
               Export ZIP
             </button>
             <span id="last-name-hint" style="font-family:var(--mono);font-size:10px;color:var(--text3);display:none"></span>
+
+            <!-- Spacer -->
+            <div style="flex:1;min-width:12px;"></div>
+
+            <!-- Quick download buttons -->
+            <div style="display:flex;gap:6px;align-items:center;border-left:1px solid var(--border);padding-left:14px;">
+              <button class="btn btn-ghost btn-sm" id="quick-dl-btn" disabled title="Process &amp; save the currently selected image as a single file">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M6 1v7M3 5.5l3 3 3-3M1 10.5h10"/></svg>
+                Quick Save
+              </button>
+              <button class="btn btn-ghost btn-sm" id="bulk-dl-btn" disabled title="Process all images &amp; save each file into a chosen folder">
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 3h8M2 6h8M2 9h8"/></svg>
+                Save All Files
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1036,6 +1183,14 @@
           <span class="panel-title">Metadata <span id="viewer-result-label" style="color:var(--text3)"></span></span>
           <button class="btn btn-ghost btn-sm" id="viewer-export-report-btn" style="display:none">Export Report</button>
         </div>
+        <div class="viewer-search-bar" id="viewer-search-bar" style="display:none">
+          <div class="viewer-search-wrap">
+            <svg class="viewer-search-icon" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="5" cy="5" r="3.5"/><path d="M8 8l2.5 2.5"/>
+            </svg>
+            <input type="text" class="viewer-search-input" id="viewer-search-input" placeholder="Search fields…">
+          </div>
+        </div>
         <div class="viewer-results-content" id="viewer-results-content">
           <div class="viewer-empty" id="viewer-empty-state">
             <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -1058,6 +1213,36 @@
         <!-- Export Options -->
         <div class="settings-section">
           <div class="settings-section-title">Export Options</div>
+
+          <!-- Output format -->
+          <div class="settings-grid" style="margin-bottom:12px;">
+            <div class="field">
+              <label>DEFAULT EXPORT FORMAT</label>
+              <select id="setting-format" style="background:var(--bg2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--sans);font-size:12px;padding:7px 10px;outline:none;cursor:pointer;width:100%;">
+                <option value="original">Same as Input (default)</option>
+                <option value="jpeg">JPEG</option>
+                <option value="png">PNG</option>
+                <option value="webp">WEBP</option>
+                <option value="tiff">TIFF</option>
+                <option value="gif">GIF</option>
+                <option value="bmp">BMP</option>
+                <option value="pdf">PDF (image-in-PDF)</option>
+              </select>
+            </div>
+            <div class="field" id="compression-field">
+              <label>DEFAULT QUALITY / COMPRESSION</label>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+                <input type="range" min="50" max="100" value="100" id="setting-quality"
+                  style="-webkit-appearance:none;flex:1;height:3px;background:var(--border2);border-radius:2px;outline:none;">
+                <span id="setting-quality-val" style="font-family:var(--mono);font-size:11px;color:var(--accent);min-width:36px;text-align:right;">100%</span>
+              </div>
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:4px;display:block;line-height:1.5;">
+                Higher compression = lower quality &amp; smaller file size. 100% = original quality.
+              </span>
+            </div>
+          </div>
+
+          <!-- Folder in ZIP -->
           <div class="toggle-row">
             <div class="toggle-col">
               <span class="toggle-label">
@@ -1065,10 +1250,9 @@
                 <span class="toggle-tag tag-optional">OPTIONAL</span>
               </span>
               <span class="toggle-desc">
-                When enabled, all exported images are placed inside a named folder within the ZIP archive.<br>
-                Unzipping creates: <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:10px;">your-zip-name/image1.jpg</code><br>
-                When disabled, images sit loose at the root:<br>
-                <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:10px;">image1.jpg</code> directly on unzip.
+                When enabled, exported images are placed inside a named folder in the ZIP.<br>
+                The folder name always matches the ZIP name (including timestamp if enabled).<br>
+                <code style="background:var(--bg3);padding:1px 5px;border-radius:3px;font-size:10px;">my-export_2024-01-15/image1.jpg</code>
               </span>
             </div>
             <div class="toggle-switch">
@@ -1109,6 +1293,32 @@
             <div class="field settings-field-full">
               <label>DEFAULT DESCRIPTION</label>
               <textarea id="setting-description" style="height:56px;" placeholder="A default description applied to all exported images..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Experimental Features -->
+        <div class="settings-section" style="border-color:rgba(255,68,68,0.25);background:rgba(255,68,68,0.03);">
+          <div class="settings-section-title" style="color:var(--red);">
+            ⚗ Experimental Features
+            <span style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.04em;font-weight:normal;margin-left:6px;">Use with caution — may have unexpected behaviour</span>
+          </div>
+
+          <div class="toggle-row" style="border-color:rgba(255,68,68,0.2);">
+            <div class="toggle-col">
+              <span class="toggle-label" style="color:var(--red);">
+                Delete Originals After Export
+                <span class="toggle-tag" style="background:rgba(255,68,68,0.15);color:var(--red);border-color:rgba(255,68,68,0.3);">EXPERIMENTAL</span>
+              </span>
+              <span class="toggle-desc">
+                After a ZIP is successfully saved, ImPrint will move the original source files to the <strong style="color:var(--text2);">system Trash</strong> — they are not permanently deleted immediately and can be recovered from Trash if needed.<br><br>
+                A confirmation dialog will appear before any files are removed. Only files that have a known disk path (loaded via drag &amp; drop or file picker in this session) can be deleted — files added via copy-paste cannot.<br><br>
+                <strong style="color:var(--red);">⚠ You are responsible for verifying your export before confirming deletion.</strong>
+              </span>
+            </div>
+            <div class="toggle-switch">
+              <input type="checkbox" id="setting-delete-original">
+              <label for="setting-delete-original" style="--toggle-on:var(--red);"></label>
             </div>
           </div>
         </div>
@@ -1254,6 +1464,7 @@ async function init() {
   });
 
   await loadWatermarks();
+  initScopeToggles();
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -1276,6 +1487,63 @@ function toast(msg, type = 'info', duration = 3000) {
     el.style.animation = 'slideOut 0.2s ease forwards';
     setTimeout(() => el.remove(), 200);
   }, duration);
+}
+
+// ─── Field scope state (all = shared, per = per-image) ────────────────────────
+// Persists until app close. Values preserved in perMeta even when scope='all'.
+const fieldScope = { description: 'all', keywords: 'all', comment: 'all', custom: 'all' };
+// Saved shared values for when user switches back from 'per' to 'all'
+const fieldScopeSharedSaved = { description: '', keywords: '', comment: '', custom: [] };
+
+function initScopeToggles() {
+  ['description','keywords','comment','custom'].forEach(field => {
+    const btn = document.getElementById(`scope-${field}`);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const current = fieldScope[field];
+      if (current === 'all') {
+        // Switching to per-image: save current shared value
+        if (field === 'custom') {
+          fieldScopeSharedSaved.custom = [...customFields];
+        } else {
+          fieldScopeSharedSaved[field] = document.getElementById(`meta-${field}`)?.value || '';
+        }
+        fieldScope[field] = 'per';
+      } else {
+        // Switching back to all: restore saved shared value
+        if (field === 'custom') {
+          customFields = [...(fieldScopeSharedSaved.custom || [])];
+          renderCustomFields();
+        } else {
+          const inp = document.getElementById(`meta-${field}`);
+          if (inp) inp.value = fieldScopeSharedSaved[field] || '';
+        }
+        fieldScope[field] = 'all';
+      }
+      updateScopeUI(field);
+      renderPerImageCard(); // refresh per-image card to show/hide fields
+    });
+  });
+}
+
+function updateScopeUI(field) {
+  const btn = document.getElementById(`scope-${field}`);
+  if (!btn) return;
+  const isPer = fieldScope[field] === 'per';
+  btn.className = `scope-toggle ${isPer ? 'scope-per' : 'scope-all'}`;
+  btn.textContent = isPer ? '✎ PER IMAGE' : '⊕ ALL FILES';
+
+  if (field === 'custom') {
+    const wrap = document.getElementById('shared-custom-fields-wrap');
+    const hint = document.getElementById('custom-scope-hint');
+    if (wrap) wrap.style.opacity = isPer ? '0.3' : '1';
+    if (wrap) wrap.style.pointerEvents = isPer ? 'none' : 'auto';
+    if (hint) hint.style.display = isPer ? 'block' : 'none';
+  } else {
+    const fieldEl = document.getElementById(`field-wrap-${field}`) ||
+      document.getElementById(`meta-${field}`)?.closest('.field');
+    if (fieldEl) fieldEl.classList.toggle('field-scope-per', isPer);
+  }
 }
 
 // ─── Images & Per-image state ─────────────────────────────────────────────────
@@ -1309,11 +1577,12 @@ function handleFiles(files) {
       images.push({
         name: file.name,
         outputName: file.name,          // editable output filename
+        filePath: file.path || null,    // absolute disk path (Electron only) for delete-original
         data: url.split(',')[1],
         size: file.size,
         url,
         type: file.type,
-        perMeta: { title: '' }          // per-image title
+        perMeta: { title: '', description: '', keywords: '', comment: '', custom: [] }
       });
       added++;
       pending--;
@@ -1339,6 +1608,8 @@ function renderImageList() {
   const list = document.getElementById('image-list');
   const badge = document.getElementById('file-count-label');
   const exportBtn = document.getElementById('export-btn');
+  const quickDlBtn = document.getElementById('quick-dl-btn');
+  const bulkDlBtn  = document.getElementById('bulk-dl-btn');
   const listActions = document.getElementById('list-actions');
   const selectAllBtn = document.getElementById('select-all-btn');
 
@@ -1346,6 +1617,8 @@ function renderImageList() {
     list.innerHTML = '';
     badge.textContent = '';
     exportBtn.disabled = true;
+    quickDlBtn.disabled = true;
+    bulkDlBtn.disabled  = true;
     listActions.style.display = 'none';
     selectAllBtn.style.display = 'none';
     document.getElementById('img-count').style.display = 'none';
@@ -1358,6 +1631,9 @@ function renderImageList() {
   document.getElementById('img-count').textContent = count;
   document.getElementById('img-count').style.display = 'inline';
   exportBtn.disabled = false;
+  bulkDlBtn.disabled  = false;
+  // Quick Save only enabled when an image is actually selected
+  quickDlBtn.disabled = selectedIdx < 0;
   selectAllBtn.style.display = 'inline';
 
   list.innerHTML = images.map((img, i) => {
@@ -1436,15 +1712,53 @@ function renderPerImageCard() {
         <span class="pi-ext">${escHtml(ext)}</span>
         <button class="apply-all-btn" id="pi-reset-name-btn" title="Reset to original" style="${isRenamed ? '' : 'opacity:0.3;'}">↺</button>
       </div>
-      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.08em;margin-top:6px;margin-bottom:2px;">TITLE <span style="font-weight:normal;opacity:0.6;">— overrides shared title for this image only</span></div>
-      <div class="pi-title-row">
-        <input type="text" id="pi-title-input" value="${escHtml(img.perMeta.title)}" placeholder="Image-specific title (optional)">
-        <button class="apply-all-btn" id="pi-title-apply-all-btn" title="Apply this title to all images">Apply all</button>
+
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.08em;margin-top:6px;margin-bottom:2px;">
+        TITLE <span style="font-weight:normal;opacity:0.6;">— always per-image</span>
       </div>
-      <div style="display:flex;gap:6px;margin-top:4px;align-items:center;">
-        <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">
-          ${selectedIdx + 1} / ${images.length}
-        </span>
+      <div class="pi-title-row">
+        <input type="text" id="pi-title-input" value="${escHtml(img.perMeta.title)}" placeholder="Image-specific title">
+        <button class="apply-all-btn" id="pi-title-apply-all-btn">Apply all</button>
+      </div>
+
+      ${fieldScope.description === 'per' ? `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:0.08em;margin-top:8px;margin-bottom:2px;">DESCRIPTION <span style="opacity:0.6;font-weight:normal;">— per image</span></div>
+      <div style="display:flex;gap:5px;">
+        <textarea id="pi-description-input" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text);font-family:var(--sans);font-size:12px;padding:6px 8px;resize:none;height:48px;outline:none;" placeholder="Image-specific description...">${escHtml(img.perMeta.description)}</textarea>
+        <button class="apply-all-btn" id="pi-desc-apply-all-btn" style="align-self:flex-start;margin-top:2px;">Apply all</button>
+      </div>` : ''}
+
+      ${fieldScope.keywords === 'per' ? `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:0.08em;margin-top:8px;margin-bottom:2px;">KEYWORDS <span style="opacity:0.6;font-weight:normal;">— per image</span></div>
+      <div class="pi-title-row">
+        <input type="text" id="pi-keywords-input" value="${escHtml(img.perMeta.keywords)}" placeholder="tag1, tag2, tag3">
+        <button class="apply-all-btn" id="pi-kw-apply-all-btn">Apply all</button>
+      </div>` : ''}
+
+      ${fieldScope.comment === 'per' ? `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:0.08em;margin-top:8px;margin-bottom:2px;">COMMENT <span style="opacity:0.6;font-weight:normal;">— per image</span></div>
+      <div class="pi-title-row">
+        <input type="text" id="pi-comment-input" value="${escHtml(img.perMeta.comment)}" placeholder="Internal comment">
+        <button class="apply-all-btn" id="pi-cmt-apply-all-btn">Apply all</button>
+      </div>` : ''}
+
+      ${fieldScope.custom === 'per' ? `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--accent);letter-spacing:0.08em;margin-top:8px;margin-bottom:2px;">CUSTOM FIELDS <span style="opacity:0.6;font-weight:normal;">— per image</span></div>
+      <div id="pi-custom-fields" style="display:flex;flex-direction:column;gap:5px;margin-bottom:4px;">
+        ${(img.perMeta.custom || []).map((f,ci) => `
+          <div style="display:flex;gap:5px;align-items:center;">
+            <input type="text" value="${escHtml(f.key)}" data-ci="${ci}" data-role="key" placeholder="Field" style="width:90px;flex-shrink:0;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 7px;outline:none;">
+            <input type="text" value="${escHtml(f.value)}" data-ci="${ci}" data-role="val" placeholder="Value" style="flex:1;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:5px 7px;outline:none;">
+            <button data-ci="${ci}" data-role="del" style="width:22px;height:22px;border:none;background:transparent;color:var(--text3);cursor:pointer;font-size:14px;flex-shrink:0;">×</button>
+          </div>`).join('')}
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="apply-all-btn" id="pi-custom-add-btn">+ Add</button>
+        <button class="apply-all-btn" id="pi-custom-apply-all-btn">Apply all images</button>
+      </div>` : ''}
+
+      <div style="display:flex;gap:6px;margin-top:8px;align-items:center;">
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text3);">${selectedIdx + 1} / ${images.length}</span>
         ${selectedIdx > 0 ? `<button class="apply-all-btn" id="pi-prev-btn">◀ Prev</button>` : ''}
         ${selectedIdx < images.length - 1 ? `<button class="apply-all-btn" id="pi-next-btn">Next ▶</button>` : ''}
       </div>
@@ -1498,6 +1812,68 @@ function renderPerImageCard() {
     renderPerImageCard();
     document.querySelector('.image-item.selected')?.scrollIntoView({ block: 'nearest' });
   });
+
+  // Per-image description (only shown when fieldScope.description === 'per')
+  const descInput = document.getElementById('pi-description-input');
+  if (descInput) {
+    descInput.addEventListener('input', () => { images[selectedIdx].perMeta.description = descInput.value; });
+    document.getElementById('pi-desc-apply-all-btn')?.addEventListener('click', () => {
+      const v = descInput.value;
+      images.forEach(i => { i.perMeta.description = v; });
+      toast(`Description applied to all ${images.length} images`, 'success', 1500);
+    });
+  }
+
+  // Per-image keywords
+  const kwInput = document.getElementById('pi-keywords-input');
+  if (kwInput) {
+    kwInput.addEventListener('input', () => { images[selectedIdx].perMeta.keywords = kwInput.value; });
+    document.getElementById('pi-kw-apply-all-btn')?.addEventListener('click', () => {
+      const v = kwInput.value;
+      images.forEach(i => { i.perMeta.keywords = v; });
+      toast(`Keywords applied to all ${images.length} images`, 'success', 1500);
+    });
+  }
+
+  // Per-image comment
+  const cmtInput = document.getElementById('pi-comment-input');
+  if (cmtInput) {
+    cmtInput.addEventListener('input', () => { images[selectedIdx].perMeta.comment = cmtInput.value; });
+    document.getElementById('pi-cmt-apply-all-btn')?.addEventListener('click', () => {
+      const v = cmtInput.value;
+      images.forEach(i => { i.perMeta.comment = v; });
+      toast(`Comment applied to all ${images.length} images`, 'success', 1500);
+    });
+  }
+
+  // Per-image custom fields
+  const piCustom = document.getElementById('pi-custom-fields');
+  if (piCustom) {
+    piCustom.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const ci = parseInt(inp.dataset.ci);
+        const role = inp.dataset.role;
+        if (!images[selectedIdx].perMeta.custom[ci]) return;
+        images[selectedIdx].perMeta.custom[ci][role] = inp.value;
+      });
+    });
+    piCustom.querySelectorAll('[data-role="del"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ci = parseInt(btn.dataset.ci);
+        images[selectedIdx].perMeta.custom.splice(ci, 1);
+        renderPerImageCard();
+      });
+    });
+    document.getElementById('pi-custom-add-btn')?.addEventListener('click', () => {
+      images[selectedIdx].perMeta.custom.push({ key: '', value: '' });
+      renderPerImageCard();
+    });
+    document.getElementById('pi-custom-apply-all-btn')?.addEventListener('click', () => {
+      const snap = JSON.parse(JSON.stringify(images[selectedIdx].perMeta.custom));
+      images.forEach(i => { i.perMeta.custom = JSON.parse(JSON.stringify(snap)); });
+      toast(`Custom fields applied to all ${images.length} images`, 'success', 1500);
+    });
+  }
 }
 
 // ─── Bulk rename ───────────────────────────────────────────────────────────────
@@ -1748,32 +2124,24 @@ document.getElementById('wm-opacity').addEventListener('input', e => {
 document.getElementById('export-btn').addEventListener('click', async () => {
   if (!images.length) return;
 
-  // Build shared metadata from the global fields
-  const sharedMeta = {
-    author:      document.getElementById('meta-author').value.trim(),
-    copyright:   document.getElementById('meta-copyright').value.trim(),
-    software:    document.getElementById('meta-software').value.trim(),
-    description: document.getElementById('meta-description').value.trim(),
-    keywords:    document.getElementById('meta-keywords').value.trim(),
-    comment:     document.getElementById('meta-comment').value.trim(),
-    custom:      customFields.filter(f => f.key.trim())
-  };
-
-  // Each image gets its own metadata object: shared fields + per-image title
-  const imagesPayload = images.map(img => ({
-    name: img.outputName,          // this is the filename in the ZIP
-    data: img.data,
-    metadata: {
-      ...sharedMeta,
-      title: img.perMeta.title || ''  // per-image title overrides
-    }
-  }));
-
+  const { payload: imagesPayload, settings, outputFormat, quality } = await buildProcessPayload(images);
   const watermarkId = document.getElementById('wm-select').value || null;
-  const opacity = parseInt(document.getElementById('wm-opacity').value) || 80;
-  const zipName = document.getElementById('zip-name').value.trim() || 'processed-images';
-  const strip = document.getElementById('strip-toggle').checked;
+  const opacity     = parseInt(document.getElementById('wm-opacity').value) || 80;
+  const strip       = document.getElementById('strip-toggle').checked;
   const folderInZip = document.getElementById('setting-folder-in-zip').checked;
+  const addTimestamp = document.getElementById('zip-timestamp').checked;
+
+  let zipBase = document.getElementById('zip-name').value.trim() || 'processed-images';
+  if (addTimestamp) {
+    const now = new Date();
+    const ts = now.getFullYear()
+      + '-' + String(now.getMonth()+1).padStart(2,'0')
+      + '-' + String(now.getDate()).padStart(2,'0')
+      + '_' + String(now.getHours()).padStart(2,'0')
+      + '-' + String(now.getMinutes()).padStart(2,'0')
+      + '-' + String(now.getSeconds()).padStart(2,'0');
+    zipBase = `${zipBase}_${ts}`;
+  }
 
   document.getElementById('progress-overlay').classList.add('show');
   document.getElementById('progress-bar').style.width = '20%';
@@ -1781,18 +2149,14 @@ document.getElementById('export-btn').addEventListener('click', async () => {
 
   try {
     const zipData = await window.api.processImages({
-      images: imagesPayload,
-      watermarkId,
-      opacity,
-      strip,
-      folderInZip,
-      zipFolderName: zipName
+      images: imagesPayload, watermarkId, opacity, strip,
+      folderInZip, zipFolderName: zipBase, outputFormat, quality
     });
 
     document.getElementById('progress-bar').style.width = '80%';
     document.getElementById('progress-count').textContent = 'Saving ZIP...';
 
-    const savedName = await window.api.saveZip(zipData, zipName);
+    const savedName = await window.api.saveZip(zipData, zipBase);
     document.getElementById('progress-overlay').classList.remove('show');
 
     if (savedName) {
@@ -1800,7 +2164,151 @@ document.getElementById('export-btn').addEventListener('click', async () => {
       const hint = document.getElementById('last-name-hint');
       hint.textContent = `Last: ${savedName}.zip`;
       hint.style.display = 'block';
-      document.getElementById('zip-name').value = savedName;
+      document.getElementById('zip-name').value = document.getElementById('zip-name').value.trim() || 'processed-images';
+
+      // ── Delete originals (experimental) ──────────────────────────────────
+      if (settings.deleteOriginal) {
+        const paths = images.map(i => i.filePath).filter(Boolean);
+        if (paths.length === 0) {
+          toast('Delete Originals: no file paths available (files may have been pasted rather than dropped)', 'error', 4000);
+        } else {
+          const noPath = images.length - paths.length;
+          const msg = `Move ${paths.length} original file${paths.length > 1 ? 's' : ''} to Trash?\n\n`
+            + paths.map(p => `  • ${p}`).join('\n')
+            + (noPath > 0 ? `\n\n(${noPath} file${noPath > 1 ? 's' : ''} skipped — no path available)` : '')
+            + '\n\nThis cannot be undone from within Imprint. Recover from Trash if needed.';
+          const confirmed = await window.api.confirmDeleteOriginals(msg);
+          if (confirmed) {
+            const result = await window.api.deleteOriginals(paths);
+            const failed = result.filter(r => !r.ok);
+            if (failed.length === 0) {
+              toast(`${paths.length} original${paths.length > 1 ? 's' : ''} moved to Trash`, 'success');
+            } else {
+              toast(`${paths.length - failed.length} moved to Trash · ${failed.length} failed`, 'error', 5000);
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    document.getElementById('progress-overlay').classList.remove('show');
+    toast(`Error: ${err.message}`, 'error', 5000);
+    console.error(err);
+  }
+});
+
+// ─── Shared payload builder ────────────────────────────────────────────────────
+// Reused by Export ZIP, Quick Save, and Save All Files
+async function buildProcessPayload(targetImages) {
+  const settings = await window.api.getSettings();
+  const outputFormat = settings.outputFormat || 'original';
+  const quality      = settings.quality ?? 100;
+  const extMap = { jpeg:'jpg', png:'png', webp:'webp', tiff:'tif', gif:'gif', bmp:'bmp', pdf:'pdf' };
+
+  const sharedMeta = {
+    author:      document.getElementById('meta-author').value.trim(),
+    copyright:   document.getElementById('meta-copyright').value.trim(),
+    software:    document.getElementById('meta-software').value.trim(),
+    description: fieldScope.description === 'all' ? document.getElementById('meta-description').value.trim() : null,
+    keywords:    fieldScope.keywords    === 'all' ? document.getElementById('meta-keywords').value.trim()    : null,
+    comment:     fieldScope.comment     === 'all' ? document.getElementById('meta-comment').value.trim()     : null,
+    custom:      fieldScope.custom      === 'all' ? customFields.filter(f => f.key.trim())                   : null,
+  };
+
+  const payload = targetImages.map(img => {
+    const [base, origExt] = splitExt(img.outputName);
+    const outExt = (outputFormat === 'original' || !extMap[outputFormat])
+      ? origExt
+      : ('.' + extMap[outputFormat]);
+    return {
+      name: base + outExt,
+      data: img.data,
+      metadata: {
+        author:      sharedMeta.author,
+        copyright:   sharedMeta.copyright,
+        software:    sharedMeta.software,
+        title:       img.perMeta.title || '',
+        description: fieldScope.description === 'per' ? (img.perMeta.description || '') : (sharedMeta.description || ''),
+        keywords:    fieldScope.keywords    === 'per' ? (img.perMeta.keywords || '')    : (sharedMeta.keywords    || ''),
+        comment:     fieldScope.comment     === 'per' ? (img.perMeta.comment || '')     : (sharedMeta.comment     || ''),
+        custom:      fieldScope.custom      === 'per' ? (img.perMeta.custom || [])      : (sharedMeta.custom      || []),
+      }
+    };
+  });
+
+  return { payload, settings, outputFormat, quality };
+}
+
+// ─── Quick Save (selected image) ───────────────────────────────────────────────
+document.getElementById('quick-dl-btn').addEventListener('click', async () => {
+  if (selectedIdx < 0 || !images[selectedIdx]) return;
+
+  const img = images[selectedIdx];
+  const { payload, settings, outputFormat, quality } = await buildProcessPayload([img]);
+  const watermarkId = document.getElementById('wm-select').value || null;
+  const opacity     = parseInt(document.getElementById('wm-opacity').value) || 80;
+  const strip       = document.getElementById('strip-toggle').checked;
+
+  document.getElementById('progress-overlay').classList.add('show');
+  document.getElementById('progress-bar').style.width = '30%';
+  document.getElementById('progress-count').textContent = `Processing ${img.name}...`;
+
+  try {
+    const zipData = await window.api.processImages({
+      images: payload, watermarkId, opacity, strip,
+      folderInZip: false, zipFolderName: 'tmp',
+      outputFormat, quality
+    });
+
+    document.getElementById('progress-bar').style.width = '75%';
+    document.getElementById('progress-count').textContent = 'Opening save dialog...';
+
+    const saved = await window.api.saveFile({
+      zipData,
+      defaultName: payload[0].name,
+    });
+
+    document.getElementById('progress-overlay').classList.remove('show');
+    if (saved) toast(`Saved: ${saved}`, 'success');
+  } catch (err) {
+    document.getElementById('progress-overlay').classList.remove('show');
+    toast(`Error: ${err.message}`, 'error', 5000);
+    console.error(err);
+  }
+});
+
+// ─── Save All Files (bulk — no ZIP, folder picker) ────────────────────────────
+document.getElementById('bulk-dl-btn').addEventListener('click', async () => {
+  if (!images.length) return;
+
+  const { payload, settings, outputFormat, quality } = await buildProcessPayload(images);
+  const watermarkId = document.getElementById('wm-select').value || null;
+  const opacity     = parseInt(document.getElementById('wm-opacity').value) || 80;
+  const strip       = document.getElementById('strip-toggle').checked;
+
+  document.getElementById('progress-overlay').classList.add('show');
+  document.getElementById('progress-bar').style.width = '20%';
+  document.getElementById('progress-count').textContent = `Processing ${images.length} image${images.length > 1 ? 's' : ''}...`;
+
+  try {
+    const zipData = await window.api.processImages({
+      images: payload, watermarkId, opacity, strip,
+      folderInZip: false, zipFolderName: 'tmp',
+      outputFormat, quality
+    });
+
+    document.getElementById('progress-bar').style.width = '75%';
+    document.getElementById('progress-count').textContent = 'Choosing folder...';
+
+    const result = await window.api.saveFilesToFolder({
+      zipData,
+      files: payload.map(p => p.name),
+    });
+
+    document.getElementById('progress-overlay').classList.remove('show');
+
+    if (result && result.saved > 0) {
+      toast(`${result.saved} file${result.saved > 1 ? 's' : ''} saved to ${result.folder}`, 'success');
     }
   } catch (err) {
     document.getElementById('progress-overlay').classList.remove('show');
@@ -2399,29 +2907,53 @@ function showViewerResult(idx) {
     return;
   }
 
-  const exifEntries = Object.entries(result.exif || {});
-  const orient = { 1:'Normal', 2:'Flip H', 3:'Rotate 180°', 4:'Flip V', 5:'Transpose', 6:'Rotate 90° CW', 7:'Transverse', 8:'Rotate 90° CCW' };
-  const resUnit = { 1:'No unit', 2:'inch', 3:'cm' };
+  // Preferred group display order
+  const groupOrder = ['File Info','JFIF','Image','EXIF / Camera','Camera','Camera Settings',
+    'Dates & Time','Creator & Description','IPTC','XMP','GPS','C2PA / Provenance',
+    'ICC Profile','EXIF','EXIF / Other'];
 
-  // File info rows
-  const fileRows = [
-    ['Format', result.format?.toUpperCase()],
-    ['Dimensions', result.width && result.height ? `${result.width} × ${result.height} px` : null],
-    ['Color space', result.space],
-    ['Channels', result.channels],
-    ['Bit depth', result.depth],
-    ['Density', result.density ? `${result.density} dpi` : null],
-    ['Orientation', result.orientation ? (orient[result.orientation] || result.orientation) : null],
-    ['Alpha channel', result.hasAlpha ? 'Yes' : 'No'],
-    ['ICC profile', result.hasProfile ? 'Embedded' : 'None'],
-    ['File size', formatViewerSize(result.rawSize)],
-  ].filter(([,v]) => v !== null && v !== undefined);
+  const groups = result.groups || {};
+  const groupNames = [
+    ...groupOrder.filter(g => groups[g]),
+    ...Object.keys(groups).filter(g => !groupOrder.includes(g)).sort()
+  ];
 
-  const exifHtml = exifEntries.length
-    ? exifEntries.map(([k, v]) => `<tr><td>${escHtml(k)}</td><td>${escHtml(String(v))}</td></tr>`).join('')
-    : `<tr class="meta-empty-row"><td colspan="2">No EXIF metadata found in this file</td></tr>`;
+  const totalTags = Object.values(groups).reduce((n, arr) => n + arr.length, 0);
 
-  const hasData = result.hasExif || result.hasIcc || result.hasIptc || result.hasXmp;
+  const groupsHtml = groupNames.map(gName => {
+    const rows = groups[gName];
+    const rowsHtml = rows.map(({ key, value }) => {
+      const isBinary = value.startsWith('(Binary') || value.startsWith('(Empty)');
+      return `<tr>
+        <td style="white-space:nowrap;width:38%;padding:5px 10px 5px 12px;font-family:var(--mono);font-size:10px;color:var(--text3);vertical-align:top;">${escHtml(key)}</td>
+        <td style="padding:5px 12px 5px 8px;font-size:11px;${isBinary ? 'color:var(--text3);font-style:italic;' : ''}word-break:break-all;vertical-align:top;">${escHtml(value)}</td>
+      </tr>`;
+    }).join('');
+
+    // Color accent per group
+    const groupColors = {
+      'File Info': '#4499ff', 'Image': '#44ff88', 'JFIF': '#44ff88',
+      'EXIF / Camera': '#e8ff47', 'Camera': '#e8ff47', 'Camera Settings': '#e8ff47',
+      'GPS': '#ff9944', 'Creator & Description': '#cc88ff',
+      'IPTC': '#ff88cc', 'XMP': '#88ccff',
+      'C2PA / Provenance': '#ff6666', 'ICC Profile': '#88ffcc',
+    };
+    const color = groupColors[gName] || '#888888';
+
+    return `<div class="meta-group">
+      <div class="meta-group-header" data-group="${escHtml(gName)}">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
+          <span style="font-family:var(--mono);font-size:10px;letter-spacing:0.08em;color:var(--text2);">${escHtml(gName)}</span>
+          <span class="group-count">${rows.length}</span>
+        </span>
+        <svg class="group-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5l3 3 3-3"/></svg>
+      </div>
+      <div class="meta-group-body">
+        <table style="width:100%;border-collapse:collapse;">${rowsHtml}</table>
+      </div>
+    </div>`;
+  }).join('');
 
   content.innerHTML = `
     <div class="meta-result">
@@ -2432,22 +2964,24 @@ function showViewerResult(idx) {
           <div class="meta-result-dims">${result.width} × ${result.height} · ${result.format?.toUpperCase()} · ${formatViewerSize(result.rawSize)}</div>
         </div>
       </div>
-      <div class="meta-chips">
+      <div class="meta-chips" style="margin-bottom:12px;">
         <span class="meta-chip ${result.hasExif ? 'chip-has' : 'chip-none'}">EXIF ${result.hasExif ? '✓' : '✗'}</span>
         <span class="meta-chip ${result.hasIptc ? 'chip-has' : 'chip-none'}">IPTC ${result.hasIptc ? '✓' : '✗'}</span>
         <span class="meta-chip ${result.hasXmp ? 'chip-has' : 'chip-none'}">XMP ${result.hasXmp ? '✓' : '✗'}</span>
         <span class="meta-chip ${result.hasProfile ? 'chip-has' : 'chip-none'}">ICC ${result.hasProfile ? '✓' : '✗'}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text3);margin-left:auto;">${totalTags} fields · ${groupNames.length} sections</span>
       </div>
-
-      <div class="meta-section-label">File Info</div>
-      <table class="meta-table">
-        ${fileRows.map(([k, v]) => `<tr><td>${escHtml(k)}</td><td>${escHtml(String(v))}</td></tr>`).join('')}
-      </table>
-
-      <div class="meta-section-label">EXIF Fields</div>
-      <table class="meta-table">${exifHtml}</table>
+      ${groupNames.length ? groupsHtml : '<div style="font-family:var(--mono);font-size:11px;color:var(--text3);padding:16px;">No metadata found — only basic image info available.</div>'}
     </div>
   `;
+
+  // Collapsible group headers
+  content.querySelectorAll('.meta-group-header').forEach(hdr => {
+    hdr.addEventListener('click', () => {
+      hdr.classList.toggle('collapsed');
+      hdr.nextElementSibling.classList.toggle('collapsed');
+    });
+  });
 }
 
 // Export text report
@@ -2457,18 +2991,16 @@ document.getElementById('viewer-export-report-btn').addEventListener('click', as
   viewerResults.forEach((r, i) => {
     report += `FILE ${i+1}: ${r.name}\n`;
     if (r.error) { report += `  ERROR: ${r.error}\n\n`; return; }
-    report += `  Format: ${r.format?.toUpperCase()}  Dimensions: ${r.width}×${r.height}  Size: ${formatViewerSize(r.rawSize)}\n`;
-    report += `  EXIF: ${r.hasExif?'yes':'no'}  IPTC: ${r.hasIptc?'yes':'no'}  XMP: ${r.hasXmp?'yes':'no'}  ICC: ${r.hasProfile?'yes':'no'}\n`;
-    const exif = Object.entries(r.exif || {});
-    if (exif.length) {
-      report += `  EXIF Fields:\n`;
-      exif.forEach(([k, v]) => { report += `    ${k}: ${v}\n`; });
-    } else {
-      report += `  No EXIF fields found.\n`;
+    report += `  ${r.width}×${r.height} · ${r.format?.toUpperCase()} · ${formatViewerSize(r.rawSize)}\n`;
+    report += `  EXIF:${r.hasExif?'✓':'✗'} IPTC:${r.hasIptc?'✓':'✗'} XMP:${r.hasXmp?'✓':'✗'} ICC:${r.hasProfile?'✓':'✗'}\n\n`;
+    const groups = r.groups || {};
+    for (const [group, rows] of Object.entries(groups)) {
+      report += `  ── ${group} ──\n`;
+      rows.forEach(({ key, value }) => { report += `    ${key}: ${value}\n`; });
+      report += '\n';
     }
     report += '\n';
   });
-  // Use save dialog via zip mechanism — save as .txt
   const blob = new Blob([report], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2484,7 +3016,41 @@ function formatViewerSize(bytes) {
   return `${(bytes/1024/1024).toFixed(2)} MB`;
 }
 
+// ─── Theme ─────────────────────────────────────────────────────────────────────
+function applyTheme(mode) {
+  const isLight = mode === 'light';
+  document.documentElement.classList.toggle('light', isLight);
+  document.getElementById('theme-icon-dark').style.display = isLight ? 'none' : 'block';
+  document.getElementById('theme-icon-light').style.display = isLight ? 'block' : 'none';
+  document.getElementById('theme-toggle-btn').title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+  try { localStorage.setItem('imprint-theme', mode); } catch {}
+}
+
+document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+  const isLight = document.documentElement.classList.contains('light');
+  applyTheme(isLight ? 'dark' : 'light');
+});
+
+// Load saved theme on boot
+try {
+  const saved = localStorage.getItem('imprint-theme');
+  if (saved) applyTheme(saved);
+} catch {}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
+
+// Quality slider live label
+document.getElementById('setting-quality').addEventListener('input', e => {
+  document.getElementById('setting-quality-val').textContent = `${e.target.value}%`;
+});
+
+// Show/hide compression based on format (GIF and BMP don't use quality; original = depends on input)
+document.getElementById('setting-format').addEventListener('change', e => {
+  const noQuality = ['gif', 'bmp', 'original'];
+  const hide = noQuality.includes(e.target.value);
+  document.getElementById('compression-field').style.opacity = hide ? '0.4' : '1';
+  document.getElementById('compression-field').style.pointerEvents = hide ? 'none' : 'auto';
+});
 
 async function loadSettings() {
   const settings = await window.api.getSettings();
@@ -2495,15 +3061,25 @@ async function loadSettings() {
   document.getElementById('setting-keywords').value    = d.keywords    || '';
   document.getElementById('setting-comment').value     = d.comment     || '';
   document.getElementById('setting-description').value = d.description || '';
-  document.getElementById('setting-powered-by').checked = settings.poweredBy !== false;
+  document.getElementById('setting-powered-by').checked    = settings.poweredBy !== false;
   document.getElementById('setting-folder-in-zip').checked = !!settings.folderInZip;
+  document.getElementById('setting-delete-original').checked = !!settings.deleteOriginal;
+  document.getElementById('setting-format').value = settings.outputFormat || 'original';
+  const q = settings.quality ?? 100;
+  document.getElementById('setting-quality').value = q;
+  document.getElementById('setting-quality-val').textContent = `${q}%`;
+  // Trigger format change to update compression visibility
+  document.getElementById('setting-format').dispatchEvent(new Event('change'));
   return settings;
 }
 
 document.getElementById('save-settings-btn').addEventListener('click', async () => {
   const settings = {
-    poweredBy: document.getElementById('setting-powered-by').checked,
-    folderInZip: document.getElementById('setting-folder-in-zip').checked,
+    poweredBy:      document.getElementById('setting-powered-by').checked,
+    folderInZip:    document.getElementById('setting-folder-in-zip').checked,
+    deleteOriginal: document.getElementById('setting-delete-original').checked,
+    outputFormat: document.getElementById('setting-format').value,
+    quality:      parseInt(document.getElementById('setting-quality').value),
     defaults: {
       author:      document.getElementById('setting-author').value.trim(),
       copyright:   document.getElementById('setting-copyright').value.trim(),
@@ -2520,12 +3096,10 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
   toast('Settings saved', 'success', 1500);
 });
 
-// Open external links via shell (Electron handles this)
+// Open external links via shell
 document.querySelectorAll('a[href^="http"]').forEach(a => {
   a.addEventListener('click', e => {
     e.preventDefault();
-    // In Electron, use shell.openExternal — wire through IPC if needed
-    // For now, window.open works in Electron renderer
     window.open(a.href, '_blank');
   });
 });
